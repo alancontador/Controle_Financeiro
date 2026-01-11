@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 
@@ -54,6 +55,8 @@ export function Header() {
             className="pl-10 w-full lg:w-64 bg-secondary border-border focus:border-primary"
           />
         </div>
+
+        <ThemeToggle />
         
         <button className="relative p-2 rounded-lg bg-secondary hover:bg-muted transition-colors shrink-0">
           <Bell className="w-5 h-5 text-muted-foreground" />

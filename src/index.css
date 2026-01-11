@@ -8,7 +8,63 @@
 
 @layer base {
   :root {
-    /* Dark theme as default - Cockpit aesthetic */
+    /* Light theme */
+    --background: 0 0% 98%;
+    --foreground: 240 10% 10%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 10%;
+
+    --primary: 255 75% 60%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 240 5% 92%;
+    --secondary-foreground: 240 10% 10%;
+
+    --muted: 240 5% 92%;
+    --muted-foreground: 240 5% 45%;
+
+    --accent: 160 100% 35%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 72% 55%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 240 5% 85%;
+    --input: 240 5% 85%;
+    --ring: 255 75% 60%;
+
+    --radius: 0.75rem;
+
+    /* Custom tokens */
+    --success: 160 100% 35%;
+    --warning: 35 100% 45%;
+    --chart-1: 255 75% 60%;
+    --chart-2: 160 100% 35%;
+    --chart-3: 35 100% 45%;
+    --chart-4: 200 100% 45%;
+    --chart-5: 280 100% 55%;
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5% 45%;
+    --sidebar-primary: 255 75% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 5% 92%;
+    --sidebar-accent-foreground: 240 10% 10%;
+    --sidebar-border: 240 5% 85%;
+    --sidebar-ring: 255 75% 60%;
+
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(255 75% 60%), hsl(280 100% 55%));
+    --gradient-success: linear-gradient(135deg, hsl(160 100% 35%), hsl(180 100% 40%));
+    --gradient-card: linear-gradient(180deg, hsl(0 0% 100%), hsl(0 0% 98%));
+  }
+
+  .dark {
+    /* Dark theme - Cockpit aesthetic */
     --background: 240 10% 4%;
     --foreground: 0 0% 91%;
 
@@ -36,8 +92,6 @@
     --border: 240 4% 16%;
     --input: 240 4% 16%;
     --ring: 255 75% 64%;
-
-    --radius: 0.75rem;
 
     /* Custom tokens */
     --success: 160 100% 39%;
@@ -61,36 +115,6 @@
     --gradient-primary: linear-gradient(135deg, hsl(255 75% 64%), hsl(280 100% 60%));
     --gradient-success: linear-gradient(135deg, hsl(160 100% 39%), hsl(180 100% 45%));
     --gradient-card: linear-gradient(180deg, hsl(240 6% 9%), hsl(240 6% 6%));
-  }
-
-  .dark {
-    --background: 240 10% 4%;
-    --foreground: 0 0% 91%;
-    --card: 240 6% 7%;
-    --card-foreground: 0 0% 91%;
-    --popover: 240 6% 7%;
-    --popover-foreground: 0 0% 91%;
-    --primary: 255 75% 64%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 240 5% 12%;
-    --secondary-foreground: 0 0% 91%;
-    --muted: 240 4% 16%;
-    --muted-foreground: 240 5% 65%;
-    --accent: 160 100% 39%;
-    --accent-foreground: 0 0% 100%;
-    --destructive: 0 72% 65%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 240 4% 16%;
-    --input: 240 4% 16%;
-    --ring: 255 75% 64%;
-    --sidebar-background: 240 8% 5%;
-    --sidebar-foreground: 240 5% 65%;
-    --sidebar-primary: 255 75% 64%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 5% 12%;
-    --sidebar-accent-foreground: 0 0% 91%;
-    --sidebar-border: 240 4% 16%;
-    --sidebar-ring: 255 75% 64%;
   }
 }
 
