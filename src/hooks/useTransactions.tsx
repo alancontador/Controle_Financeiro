@@ -231,6 +231,38 @@ export function useTransactions() {
     return true;
   };
 
+  const importTransactions = async (
+    transactionsToImport: Omit<Transaction, "id" | "user_id" | "created_at" | "updated_at" | "category">[]
+  ) => {
+    if (!user) return false;
+
+    const dataToInsert = transactionsToImport.map((t) => ({
+      ...t,
+      user_id: user.id,
+    }));
+
+    const { data, error } = await supabase
+      .from("transactions")
+      .insert(dataToInsert)
+      .select("*, category:categories(*)");
+
+    if (error) {
+      toast({
+        title: "Erro ao importar transações",
+        description: error.message,
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    setTransactions((prev) => [...(data as Transaction[]), ...prev]);
+    toast({
+      title: "Transações importadas",
+      description: `${data.length} transações foram importadas com sucesso.`,
+    });
+    return true;
+  };
+
   useEffect(() => {
     initializeCategories();
   }, [initializeCategories]);
@@ -250,6 +282,7 @@ export function useTransactions() {
     addTransaction,
     updateTransaction,
     deleteTransaction,
+    importTransactions,
     refetch: fetchTransactions,
   };
 }

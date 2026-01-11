@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Plus, Loader2, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { Plus, Loader2, ArrowUpRight, ArrowDownRight, Upload } from "lucide-react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { MobileNav } from "@/components/layout/MobileNav";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { TransactionFilters } from "@/components/transactions/TransactionFilters
 import { TransactionList } from "@/components/transactions/TransactionList";
 import { TransactionModal } from "@/components/transactions/TransactionModal";
 import { DeleteConfirmModal } from "@/components/transactions/DeleteConfirmModal";
+import { ImportModal } from "@/components/transactions/ImportModal";
 
 const Transactions = () => {
   const { user, loading: authLoading } = useAuth();
@@ -24,9 +25,11 @@ const Transactions = () => {
     addTransaction,
     updateTransaction,
     deleteTransaction,
+    importTransactions,
   } = useTransactions();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [deletingTransaction, setDeletingTransaction] = useState<Transaction | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -105,6 +108,24 @@ const Transactions = () => {
     setEditingTransaction(null);
   };
 
+  const handleImport = async (
+    transactionsToImport: {
+      description: string;
+      amount: number;
+      type: "income" | "expense";
+      category_id: string | null;
+      date: string;
+      notes: string | null;
+    }[]
+  ) => {
+    setIsSubmitting(true);
+    try {
+      await importTransactions(transactionsToImport);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Sidebar />
@@ -126,13 +147,23 @@ const Transactions = () => {
             </p>
           </div>
 
-          <Button
-            onClick={() => setIsModalOpen(true)}
-            className="glow-primary w-full sm:w-auto"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Nova Transação
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <Button
+              variant="outline"
+              onClick={() => setIsImportModalOpen(true)}
+              className="w-full sm:w-auto"
+            >
+              <Upload className="w-4 h-4 mr-2" />
+              Importar
+            </Button>
+            <Button
+              onClick={() => setIsModalOpen(true)}
+              className="glow-primary w-full sm:w-auto"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Nova Transação
+            </Button>
+          </div>
         </motion.div>
 
         {/* Summary Cards */}
@@ -246,6 +277,14 @@ const Transactions = () => {
         onConfirm={handleDelete}
         title="Excluir transação"
         description="Tem certeza que deseja excluir esta transação? Esta ação não pode ser desfeita."
+        isLoading={isSubmitting}
+      />
+
+      <ImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onImport={handleImport}
+        categories={categories}
         isLoading={isSubmitting}
       />
     </div>
