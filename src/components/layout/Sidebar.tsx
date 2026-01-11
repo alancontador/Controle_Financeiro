@@ -9,6 +9,7 @@ import {
   LogOut
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
 
 interface NavItem {
   icon: React.ElementType;
@@ -26,12 +27,18 @@ const navItems: NavItem[] = [
 ];
 
 export function Sidebar() {
+  const { signOut } = useAuth();
+
+  const handleSignOut = async () => {
+    await signOut();
+  };
+
   return (
     <motion.aside
       initial={{ x: -20, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
       transition={{ duration: 0.3, ease: "easeOut" }}
-      className="fixed left-0 top-0 h-screen w-64 bg-sidebar border-r border-sidebar-border flex flex-col z-50"
+      className="hidden lg:flex fixed left-0 top-0 h-screen w-64 bg-sidebar border-r border-sidebar-border flex-col z-50"
     >
       {/* Logo */}
       <div className="p-6 border-b border-sidebar-border">
@@ -83,6 +90,7 @@ export function Sidebar() {
           <span className="font-medium text-sm">Configurações</span>
         </a>
         <button
+          onClick={handleSignOut}
           className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all duration-250"
         >
           <LogOut className="w-5 h-5" />

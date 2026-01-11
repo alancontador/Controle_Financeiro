@@ -25,11 +25,11 @@ export function StatCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay, duration: 0.4, ease: "easeOut" }}
       whileHover={{ y: -4, transition: { duration: 0.2 } }}
-      className="glass-card rounded-xl p-6 hover:border-primary/30 hover:glow-primary transition-all duration-250"
+      className="glass-card rounded-xl p-4 lg:p-6 hover:border-primary/30 hover:glow-primary transition-all duration-250"
     >
-      <div className="flex items-start justify-between mb-4">
-        <div className="p-3 rounded-lg bg-primary/10 border border-primary/20">
-          <Icon className="w-5 h-5 text-primary" />
+      <div className="flex items-start justify-between mb-3 lg:mb-4">
+        <div className="p-2 lg:p-3 rounded-lg bg-primary/10 border border-primary/20">
+          <Icon className="w-4 h-4 lg:w-5 lg:h-5 text-primary" />
         </div>
         {change && (
           <div className={cn(
@@ -45,8 +45,8 @@ export function StatCard({
         )}
       </div>
       
-      <p className="text-muted-foreground text-sm mb-1">{title}</p>
-      <p className="text-foreground text-2xl font-bold tracking-tight">{value}</p>
+      <p className="text-muted-foreground text-xs lg:text-sm mb-1">{title}</p>
+      <p className="text-foreground text-lg lg:text-2xl font-bold tracking-tight">{value}</p>
     </motion.div>
   );
 }
