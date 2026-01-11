@@ -1,11 +1,15 @@
 import { motion } from "framer-motion";
 import { Plus, Bell, Search } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
+import { useProfile } from "@/hooks/useProfile";
 
 export function Header() {
   const { user } = useAuth();
+  const { profile } = useProfile();
   
   const currentDate = new Date().toLocaleDateString('pt-BR', {
     weekday: 'long',
@@ -14,7 +18,19 @@ export function Header() {
     year: 'numeric'
   });
 
-  const userName = user?.email?.split('@')[0] || 'Comandante';
+  const userName = profile?.full_name || user?.email?.split('@')[0] || 'Comandante';
+
+  const getInitials = () => {
+    if (profile?.full_name) {
+      return profile.full_name
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2);
+    }
+    return user?.email?.[0]?.toUpperCase() || "U";
+  };
 
   return (
     <motion.header
@@ -52,6 +68,15 @@ export function Header() {
         <Button size="icon" className="sm:hidden bg-primary hover:bg-primary/90 text-primary-foreground glow-primary shrink-0">
           <Plus className="w-4 h-4" />
         </Button>
+
+        <Link to="/settings" className="shrink-0">
+          <Avatar className="w-9 h-9 cursor-pointer hover:ring-2 hover:ring-primary transition-all">
+            <AvatarImage src={profile?.avatar_url || undefined} />
+            <AvatarFallback className="bg-primary/10 text-primary text-sm">
+              {getInitials()}
+            </AvatarFallback>
+          </Avatar>
+        </Link>
       </div>
     </motion.header>
   );

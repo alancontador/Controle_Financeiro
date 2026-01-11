@@ -9,6 +9,7 @@ import Auth from "./pages/Auth";
 import Transactions from "./pages/Transactions";
 import Investments from "./pages/Investments";
 import Goals from "./pages/Goals";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -26,6 +27,7 @@ const App = () => (
             <Route path="/transactions" element={<Transactions />} />
             <Route path="/investments" element={<Investments />} />
             <Route path="/goals" element={<Goals />} />
+            <Route path="/settings" element={<Settings />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

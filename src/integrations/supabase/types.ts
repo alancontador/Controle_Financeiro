@@ -95,6 +95,45 @@ export type Database = {
         }
         Relationships: []
       }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          currency: string | null
+          full_name: string | null
+          id: string
+          language: string | null
+          monthly_budget: number | null
+          notifications_enabled: boolean | null
+          theme: string | null
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          currency?: string | null
+          full_name?: string | null
+          id: string
+          language?: string | null
+          monthly_budget?: number | null
+          notifications_enabled?: boolean | null
+          theme?: string | null
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          currency?: string | null
+          full_name?: string | null
+          id?: string
+          language?: string | null
+          monthly_budget?: number | null
+          notifications_enabled?: boolean | null
+          theme?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       transactions: {
         Row: {
           amount: number
