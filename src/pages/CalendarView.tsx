@@ -33,6 +33,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useTransactions, Transaction } from "@/hooks/useTransactions";
 import { useRecurringTransactions, RecurringTransaction } from "@/hooks/useRecurringTransactions";
 import { CalendarTrends } from "@/components/calendar/CalendarTrends";
+import { SpendingForecast } from "@/components/calendar/SpendingForecast";
+import { useProfile } from "@/hooks/useProfile";
 
 interface DayData {
   date: Date;
@@ -47,9 +49,11 @@ const CalendarView = () => {
   const navigate = useNavigate();
   const { transactions, loading: transactionsLoading } = useTransactions();
   const { recurringTransactions, loading: recurringLoading } = useRecurringTransactions();
+  const { profile } = useProfile();
 
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<DayData | null>(null);
+  const [activeTab, setActiveTab] = useState("calendar");
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -467,9 +471,26 @@ const CalendarView = () => {
           )}
         </AnimatePresence>
 
-        {/* Trends Section */}
+        {/* Trends and Forecast Tabs */}
         <div className="mt-6">
-          <CalendarTrends transactions={transactions} currentMonth={currentMonth} />
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="grid w-full grid-cols-2 max-w-md mb-6">
+              <TabsTrigger value="calendar">Tendências</TabsTrigger>
+              <TabsTrigger value="forecast">Previsão</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="calendar">
+              <CalendarTrends transactions={transactions} currentMonth={currentMonth} />
+            </TabsContent>
+
+            <TabsContent value="forecast">
+              <SpendingForecast
+                transactions={transactions}
+                recurringTransactions={recurringTransactions}
+                monthlyBudget={profile?.monthly_budget || 0}
+              />
+            </TabsContent>
+          </Tabs>
         </div>
       </main>
     </div>
