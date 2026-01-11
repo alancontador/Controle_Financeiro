@@ -10,6 +10,7 @@ import { GoalsCard } from "@/components/dashboard/GoalsCard";
 import { RecentTransactionsReal } from "@/components/dashboard/RecentTransactionsReal";
 import { ExpensesByCategory } from "@/components/dashboard/ExpensesByCategory";
 import { DashboardBudgetAlerts } from "@/components/dashboard/DashboardBudgetAlerts";
+import { WeeklySummary } from "@/components/dashboard/WeeklySummary";
 import { useAuth } from "@/hooks/useAuth";
 import { useDashboardStats } from "@/hooks/useDashboardStats";
 
@@ -100,9 +101,10 @@ const Index = () => {
           />
         </div>
 
-        {/* Budget Alerts */}
-        <div className="mb-6">
+        {/* Budget Alerts & Weekly Summary */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6 mb-6">
           <DashboardBudgetAlerts />
+          <WeeklySummary />
         </div>
 
         {/* Main Content Grid - Responsive */}
