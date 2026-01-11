@@ -35,6 +35,7 @@ import { useRecurringTransactions, RecurringTransaction } from "@/hooks/useRecur
 import { CalendarTrends } from "@/components/calendar/CalendarTrends";
 import { SpendingForecast } from "@/components/calendar/SpendingForecast";
 import { CategoryComparison } from "@/components/calendar/CategoryComparison";
+import { CalendarCategoryFilter } from "@/components/calendar/CalendarCategoryFilter";
 import { useProfile } from "@/hooks/useProfile";
 
 interface DayData {
@@ -55,12 +56,29 @@ const CalendarView = () => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<DayData | null>(null);
   const [activeTab, setActiveTab] = useState("calendar");
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
 
   useEffect(() => {
     if (!authLoading && !user) {
       navigate("/auth");
     }
   }, [user, authLoading, navigate]);
+
+  // Filter transactions based on selected categories
+  const filteredTransactions = useMemo(() => {
+    if (selectedCategories.length === 0) return transactions;
+    return transactions.filter((t) => 
+      t.category_id && selectedCategories.includes(t.category_id)
+    );
+  }, [transactions, selectedCategories]);
+
+  // Filter recurring transactions based on selected categories
+  const filteredRecurringTransactions = useMemo(() => {
+    if (selectedCategories.length === 0) return recurringTransactions;
+    return recurringTransactions.filter((r) =>
+      r.category_id && selectedCategories.includes(r.category_id)
+    );
+  }, [recurringTransactions, selectedCategories]);
 
   const calendarDays = useMemo(() => {
     const monthStart = startOfMonth(currentMonth);
@@ -73,8 +91,8 @@ const CalendarView = () => {
     return days.map((date): DayData => {
       const dateStr = format(date, "yyyy-MM-dd");
 
-      const dayTransactions = transactions.filter((t) => t.date === dateStr);
-      const dayRecurring = recurringTransactions.filter(
+      const dayTransactions = filteredTransactions.filter((t) => t.date === dateStr);
+      const dayRecurring = filteredRecurringTransactions.filter(
         (r) => r.is_active && r.next_execution_date === dateStr
       );
 
@@ -94,13 +112,13 @@ const CalendarView = () => {
         totalExpense,
       };
     });
-  }, [currentMonth, transactions, recurringTransactions]);
+  }, [currentMonth, filteredTransactions, filteredRecurringTransactions]);
 
   const monthTotals = useMemo(() => {
     const monthStart = startOfMonth(currentMonth);
     const monthEnd = endOfMonth(currentMonth);
 
-    const monthTransactions = transactions.filter((t) => {
+    const monthTransactions = filteredTransactions.filter((t) => {
       const transactionDate = new Date(t.date);
       return transactionDate >= monthStart && transactionDate <= monthEnd;
     });
@@ -113,7 +131,7 @@ const CalendarView = () => {
         .filter((t) => t.type === "expense")
         .reduce((sum, t) => sum + Number(t.amount), 0),
     };
-  }, [currentMonth, transactions]);
+  }, [currentMonth, filteredTransactions]);
 
   if (authLoading) {
     return (
@@ -142,14 +160,21 @@ const CalendarView = () => {
           animate={{ opacity: 1, y: 0 }}
           className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6"
         >
-          <div>
-            <h1 className="text-2xl lg:text-3xl font-bold text-foreground tracking-tight">
-              Calendário Financeiro
-            </h1>
-            <p className="text-muted-foreground text-sm mt-1">
-              Visualize suas transações e recorrências por dia
-            </p>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <div>
+              <h1 className="text-2xl lg:text-3xl font-bold text-foreground tracking-tight">
+                Calendário Financeiro
+              </h1>
+              <p className="text-muted-foreground text-sm mt-1">
+                Visualize suas transações e recorrências por dia
+              </p>
+            </div>
           </div>
+          <CalendarCategoryFilter
+            categories={categories}
+            selectedCategories={selectedCategories}
+            onSelectionChange={setSelectedCategories}
+          />
         </motion.div>
 
         {/* Month Summary */}
@@ -482,13 +507,13 @@ const CalendarView = () => {
             </TabsList>
 
             <TabsContent value="calendar">
-              <CalendarTrends transactions={transactions} currentMonth={currentMonth} />
+              <CalendarTrends transactions={filteredTransactions} currentMonth={currentMonth} />
             </TabsContent>
 
             <TabsContent value="forecast">
               <SpendingForecast
-                transactions={transactions}
-                recurringTransactions={recurringTransactions}
+                transactions={filteredTransactions}
+                recurringTransactions={filteredRecurringTransactions}
                 monthlyBudget={profile?.monthly_budget || 0}
               />
             </TabsContent>
