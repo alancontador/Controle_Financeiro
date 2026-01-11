@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Plus, Loader2, ArrowUpRight, ArrowDownRight, Upload, Download } from "lucide-react";
+import { Plus, Loader2, ArrowUpRight, ArrowDownRight, Upload, Download, RefreshCw } from "lucide-react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { MobileNav } from "@/components/layout/MobileNav";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,11 +14,14 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/hooks/useAuth";
 import { useTransactions, Transaction } from "@/hooks/useTransactions";
+import { useRecurringTransactions, RecurringTransaction } from "@/hooks/useRecurringTransactions";
 import { TransactionFilters } from "@/components/transactions/TransactionFilters";
 import { TransactionList } from "@/components/transactions/TransactionList";
 import { TransactionModal } from "@/components/transactions/TransactionModal";
 import { DeleteConfirmModal } from "@/components/transactions/DeleteConfirmModal";
 import { ImportModal } from "@/components/transactions/ImportModal";
+import { RecurringTransactionModal } from "@/components/transactions/RecurringTransactionModal";
+import { RecurringTransactionList } from "@/components/transactions/RecurringTransactionList";
 import { exportTransactions } from "@/utils/exportTransactions";
 
 const Transactions = () => {
@@ -35,10 +39,23 @@ const Transactions = () => {
     importTransactions,
   } = useTransactions();
 
+  const {
+    recurringTransactions,
+    loading: recurringLoading,
+    addRecurringTransaction,
+    updateRecurringTransaction,
+    deleteRecurringTransaction,
+    toggleActive,
+  } = useRecurringTransactions();
+
+  const [activeTab, setActiveTab] = useState("transactions");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isRecurringModalOpen, setIsRecurringModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+  const [editingRecurring, setEditingRecurring] = useState<RecurringTransaction | null>(null);
   const [deletingTransaction, setDeletingTransaction] = useState<Transaction | null>(null);
+  const [deletingRecurring, setDeletingRecurring] = useState<RecurringTransaction | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -131,6 +148,54 @@ const Transactions = () => {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // Recurring transaction handlers
+  const handleRecurringSubmit = async (data: {
+    description: string;
+    amount: number;
+    type: "income" | "expense";
+    category_id: string | null;
+    frequency: "daily" | "weekly" | "monthly" | "yearly";
+    day_of_month: number | null;
+    day_of_week: number | null;
+    next_execution_date: string;
+    notes: string | null;
+    is_active: boolean;
+  }) => {
+    setIsSubmitting(true);
+    try {
+      if (editingRecurring) {
+        await updateRecurringTransaction(editingRecurring.id, data);
+      } else {
+        await addRecurringTransaction(data);
+      }
+      setIsRecurringModalOpen(false);
+      setEditingRecurring(null);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleEditRecurring = (transaction: RecurringTransaction) => {
+    setEditingRecurring(transaction);
+    setIsRecurringModalOpen(true);
+  };
+
+  const handleDeleteRecurring = async () => {
+    if (!deletingRecurring) return;
+    setIsSubmitting(true);
+    try {
+      await deleteRecurringTransaction(deletingRecurring.id);
+      setDeletingRecurring(null);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleCloseRecurringModal = () => {
+    setIsRecurringModalOpen(false);
+    setEditingRecurring(null);
   };
 
   return (
@@ -276,20 +341,53 @@ const Transactions = () => {
           </motion.div>
         </div>
 
-        {/* Filters */}
-        <TransactionFilters
-          filters={filters}
-          setFilters={setFilters}
-          categories={categories}
-        />
+        {/* Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+          <TabsList className="grid w-full grid-cols-2 max-w-md">
+            <TabsTrigger value="transactions">Transações</TabsTrigger>
+            <TabsTrigger value="recurring">
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Recorrentes
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Transaction List */}
-        <TransactionList
-          transactions={transactions}
-          loading={loading}
-          onEdit={handleEdit}
-          onDelete={setDeletingTransaction}
-        />
+          <TabsContent value="transactions" className="space-y-4">
+            {/* Filters */}
+            <TransactionFilters
+              filters={filters}
+              setFilters={setFilters}
+              categories={categories}
+            />
+
+            {/* Transaction List */}
+            <TransactionList
+              transactions={transactions}
+              loading={loading}
+              onEdit={handleEdit}
+              onDelete={setDeletingTransaction}
+            />
+          </TabsContent>
+
+          <TabsContent value="recurring" className="space-y-4">
+            <div className="flex justify-end">
+              <Button
+                onClick={() => setIsRecurringModalOpen(true)}
+                className="glow-primary"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Nova Recorrente
+              </Button>
+            </div>
+
+            <RecurringTransactionList
+              transactions={recurringTransactions}
+              loading={recurringLoading}
+              onEdit={handleEditRecurring}
+              onDelete={setDeletingRecurring}
+              onToggleActive={toggleActive}
+            />
+          </TabsContent>
+        </Tabs>
       </main>
 
       {/* Modals */}
@@ -311,11 +409,29 @@ const Transactions = () => {
         isLoading={isSubmitting}
       />
 
+      <DeleteConfirmModal
+        isOpen={!!deletingRecurring}
+        onClose={() => setDeletingRecurring(null)}
+        onConfirm={handleDeleteRecurring}
+        title="Excluir transação recorrente"
+        description="Tem certeza que deseja excluir esta transação recorrente? Esta ação não pode ser desfeita."
+        isLoading={isSubmitting}
+      />
+
       <ImportModal
         isOpen={isImportModalOpen}
         onClose={() => setIsImportModalOpen(false)}
         onImport={handleImport}
         categories={categories}
+        isLoading={isSubmitting}
+      />
+
+      <RecurringTransactionModal
+        isOpen={isRecurringModalOpen}
+        onClose={handleCloseRecurringModal}
+        onSubmit={handleRecurringSubmit}
+        categories={categories}
+        transaction={editingRecurring}
         isLoading={isSubmitting}
       />
     </div>

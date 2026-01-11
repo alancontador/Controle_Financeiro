@@ -172,6 +172,68 @@ export type Database = {
         }
         Relationships: []
       }
+      recurring_transactions: {
+        Row: {
+          amount: number
+          category_id: string | null
+          created_at: string
+          day_of_month: number | null
+          day_of_week: number | null
+          description: string
+          frequency: string
+          id: string
+          is_active: boolean
+          last_executed_at: string | null
+          next_execution_date: string
+          notes: string | null
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          category_id?: string | null
+          created_at?: string
+          day_of_month?: number | null
+          day_of_week?: number | null
+          description: string
+          frequency: string
+          id?: string
+          is_active?: boolean
+          last_executed_at?: string | null
+          next_execution_date: string
+          notes?: string | null
+          type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          category_id?: string | null
+          created_at?: string
+          day_of_month?: number | null
+          day_of_week?: number | null
+          description?: string
+          frequency?: string
+          id?: string
+          is_active?: boolean
+          last_executed_at?: string | null
+          next_execution_date?: string
+          notes?: string | null
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recurring_transactions_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       transactions: {
         Row: {
           amount: number
