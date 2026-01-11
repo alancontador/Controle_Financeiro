@@ -28,9 +28,11 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { MobileNav } from "@/components/layout/MobileNav";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/useAuth";
 import { useTransactions, Transaction } from "@/hooks/useTransactions";
 import { useRecurringTransactions, RecurringTransaction } from "@/hooks/useRecurringTransactions";
+import { CalendarTrends } from "@/components/calendar/CalendarTrends";
 
 interface DayData {
   date: Date;
@@ -464,6 +466,11 @@ const CalendarView = () => {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Trends Section */}
+        <div className="mt-6">
+          <CalendarTrends transactions={transactions} currentMonth={currentMonth} />
+        </div>
       </main>
     </div>
   );
