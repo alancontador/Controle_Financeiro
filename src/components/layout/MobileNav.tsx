@@ -7,6 +7,7 @@ import {
   TrendingUp, 
   Target, 
   FileText,
+  Wallet,
   Settings,
   LogOut,
   Menu,
@@ -25,6 +26,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/" },
   { icon: Receipt, label: "Transações", href: "/transactions" },
+  { icon: Wallet, label: "Orçamentos", href: "/budgets" },
   { icon: TrendingUp, label: "Investimentos", href: "/investments" },
   { icon: Target, label: "Metas", href: "/goals" },
   { icon: FileText, label: "Relatórios", href: "/reports" },
