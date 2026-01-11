@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Filter, Check, X } from "lucide-react";
+import { Filter, Check, X, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -10,17 +10,24 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Category } from "@/hooks/useTransactions";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+
+export type TransactionTypeFilter = "all" | "income" | "expense";
 
 interface CalendarCategoryFilterProps {
   categories: Category[];
   selectedCategories: string[];
   onSelectionChange: (selectedIds: string[]) => void;
+  typeFilter: TransactionTypeFilter;
+  onTypeFilterChange: (type: TransactionTypeFilter) => void;
 }
 
 export function CalendarCategoryFilter({
   categories,
   selectedCategories,
   onSelectionChange,
+  typeFilter,
+  onTypeFilterChange,
 }: CalendarCategoryFilterProps) {
   const [open, setOpen] = useState(false);
 
@@ -37,6 +44,7 @@ export function CalendarCategoryFilter({
 
   const clearFilters = () => {
     onSelectionChange([]);
+    onTypeFilterChange("all");
   };
 
   const selectAll = () => {
@@ -49,9 +57,45 @@ export function CalendarCategoryFilter({
   };
 
   const activeCount = selectedCategories.length;
+  const hasActiveFilters = activeCount > 0 || typeFilter !== "all";
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
+      {/* Type filter toggle */}
+      <ToggleGroup
+        type="single"
+        value={typeFilter}
+        onValueChange={(value) => {
+          if (value) onTypeFilterChange(value as TransactionTypeFilter);
+        }}
+        className="bg-muted/50 p-1 rounded-lg"
+      >
+        <ToggleGroupItem
+          value="all"
+          aria-label="Todas transações"
+          className="text-xs px-3 h-7 data-[state=on]:bg-background data-[state=on]:shadow-sm"
+        >
+          Todas
+        </ToggleGroupItem>
+        <ToggleGroupItem
+          value="income"
+          aria-label="Apenas receitas"
+          className="text-xs px-3 h-7 gap-1 data-[state=on]:bg-success/10 data-[state=on]:text-success"
+        >
+          <ArrowUpRight className="w-3 h-3" />
+          <span className="hidden sm:inline">Receitas</span>
+        </ToggleGroupItem>
+        <ToggleGroupItem
+          value="expense"
+          aria-label="Apenas despesas"
+          className="text-xs px-3 h-7 gap-1 data-[state=on]:bg-destructive/10 data-[state=on]:text-destructive"
+        >
+          <ArrowDownRight className="w-3 h-3" />
+          <span className="hidden sm:inline">Despesas</span>
+        </ToggleGroupItem>
+      </ToggleGroup>
+
+      {/* Category filter popover */}
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button
@@ -87,7 +131,7 @@ export function CalendarCategoryFilter({
                   variant="ghost"
                   size="sm"
                   className="h-7 text-xs"
-                  onClick={clearFilters}
+                  onClick={() => onSelectionChange([])}
                 >
                   Limpar
                 </Button>
@@ -239,7 +283,7 @@ export function CalendarCategoryFilter({
       </AnimatePresence>
 
       {/* Clear all button */}
-      {activeCount > 0 && (
+      {hasActiveFilters && (
         <Button
           variant="ghost"
           size="sm"

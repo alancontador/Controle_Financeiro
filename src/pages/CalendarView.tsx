@@ -35,7 +35,7 @@ import { useRecurringTransactions, RecurringTransaction } from "@/hooks/useRecur
 import { CalendarTrends } from "@/components/calendar/CalendarTrends";
 import { SpendingForecast } from "@/components/calendar/SpendingForecast";
 import { CategoryComparison } from "@/components/calendar/CategoryComparison";
-import { CalendarCategoryFilter } from "@/components/calendar/CalendarCategoryFilter";
+import { CalendarCategoryFilter, TransactionTypeFilter } from "@/components/calendar/CalendarCategoryFilter";
 import { useProfile } from "@/hooks/useProfile";
 
 interface DayData {
@@ -57,6 +57,7 @@ const CalendarView = () => {
   const [selectedDay, setSelectedDay] = useState<DayData | null>(null);
   const [activeTab, setActiveTab] = useState("calendar");
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [typeFilter, setTypeFilter] = useState<TransactionTypeFilter>("all");
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -64,21 +65,43 @@ const CalendarView = () => {
     }
   }, [user, authLoading, navigate]);
 
-  // Filter transactions based on selected categories
+  // Filter transactions based on selected categories and type
   const filteredTransactions = useMemo(() => {
-    if (selectedCategories.length === 0) return transactions;
-    return transactions.filter((t) => 
-      t.category_id && selectedCategories.includes(t.category_id)
-    );
-  }, [transactions, selectedCategories]);
+    let filtered = transactions;
+    
+    // Apply type filter
+    if (typeFilter !== "all") {
+      filtered = filtered.filter((t) => t.type === typeFilter);
+    }
+    
+    // Apply category filter
+    if (selectedCategories.length > 0) {
+      filtered = filtered.filter((t) => 
+        t.category_id && selectedCategories.includes(t.category_id)
+      );
+    }
+    
+    return filtered;
+  }, [transactions, selectedCategories, typeFilter]);
 
-  // Filter recurring transactions based on selected categories
+  // Filter recurring transactions based on selected categories and type
   const filteredRecurringTransactions = useMemo(() => {
-    if (selectedCategories.length === 0) return recurringTransactions;
-    return recurringTransactions.filter((r) =>
-      r.category_id && selectedCategories.includes(r.category_id)
-    );
-  }, [recurringTransactions, selectedCategories]);
+    let filtered = recurringTransactions;
+    
+    // Apply type filter
+    if (typeFilter !== "all") {
+      filtered = filtered.filter((r) => r.type === typeFilter);
+    }
+    
+    // Apply category filter
+    if (selectedCategories.length > 0) {
+      filtered = filtered.filter((r) =>
+        r.category_id && selectedCategories.includes(r.category_id)
+      );
+    }
+    
+    return filtered;
+  }, [recurringTransactions, selectedCategories, typeFilter]);
 
   const calendarDays = useMemo(() => {
     const monthStart = startOfMonth(currentMonth);
@@ -174,6 +197,8 @@ const CalendarView = () => {
             categories={categories}
             selectedCategories={selectedCategories}
             onSelectionChange={setSelectedCategories}
+            typeFilter={typeFilter}
+            onTypeFilterChange={setTypeFilter}
           />
         </motion.div>
 
