@@ -9,6 +9,7 @@ import {
   FileText,
   Wallet,
   Brain,
+  CalendarDays,
   Settings,
   LogOut,
   Menu,
@@ -27,6 +28,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/" },
   { icon: Receipt, label: "Transações", href: "/transactions" },
+  { icon: CalendarDays, label: "Calendário", href: "/calendar" },
   { icon: Wallet, label: "Orçamentos", href: "/budgets" },
   { icon: TrendingUp, label: "Investimentos", href: "/investments" },
   { icon: Target, label: "Metas", href: "/goals" },
