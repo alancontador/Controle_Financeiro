@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { Link, useLocation } from "react-router-dom";
 import { 
   LayoutDashboard, 
   Receipt, 
@@ -15,11 +16,10 @@ interface NavItem {
   icon: React.ElementType;
   label: string;
   href: string;
-  active?: boolean;
 }
 
 const navItems: NavItem[] = [
-  { icon: LayoutDashboard, label: "Dashboard", href: "/", active: true },
+  { icon: LayoutDashboard, label: "Dashboard", href: "/" },
   { icon: Receipt, label: "Transações", href: "/transactions" },
   { icon: TrendingUp, label: "Investimentos", href: "/investments" },
   { icon: Target, label: "Metas", href: "/goals" },
@@ -28,6 +28,7 @@ const navItems: NavItem[] = [
 
 export function Sidebar() {
   const { signOut } = useAuth();
+  const location = useLocation();
 
   const handleSignOut = async () => {
     await signOut();
@@ -55,40 +56,46 @@ export function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 p-4 space-y-1">
-        {navItems.map((item, index) => (
-          <motion.a
-            key={item.label}
-            href={item.href}
-            initial={{ opacity: 0, x: -10 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: index * 0.05, duration: 0.2 }}
-            className={cn(
-              "flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-250 group",
-              item.active
-                ? "bg-primary/10 text-primary border border-primary/20"
-                : "text-muted-foreground hover:text-foreground hover:bg-secondary"
-            )}
-          >
-            <item.icon 
-              className={cn(
-                "w-5 h-5 transition-colors",
-                item.active ? "text-primary" : "group-hover:text-primary"
-              )} 
-            />
-            <span className="font-medium text-sm">{item.label}</span>
-          </motion.a>
-        ))}
+        {navItems.map((item, index) => {
+          const isActive = location.pathname === item.href;
+          return (
+            <motion.div
+              key={item.label}
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: index * 0.05, duration: 0.2 }}
+            >
+              <Link
+                to={item.href}
+                className={cn(
+                  "flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-250 group",
+                  isActive
+                    ? "bg-primary/10 text-primary border border-primary/20"
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+                )}
+              >
+                <item.icon 
+                  className={cn(
+                    "w-5 h-5 transition-colors",
+                    isActive ? "text-primary" : "group-hover:text-primary"
+                  )} 
+                />
+                <span className="font-medium text-sm">{item.label}</span>
+              </Link>
+            </motion.div>
+          );
+        })}
       </nav>
 
       {/* Bottom section */}
       <div className="p-4 border-t border-sidebar-border space-y-1">
-        <a
-          href="/settings"
+        <Link
+          to="/settings"
           className="flex items-center gap-3 px-4 py-3 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-all duration-250"
         >
           <Settings className="w-5 h-5" />
           <span className="font-medium text-sm">Configurações</span>
-        </a>
+        </Link>
         <button
           onClick={handleSignOut}
           className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all duration-250"
