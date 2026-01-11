@@ -36,6 +36,7 @@ import { CalendarTrends } from "@/components/calendar/CalendarTrends";
 import { SpendingForecast } from "@/components/calendar/SpendingForecast";
 import { CategoryComparison } from "@/components/calendar/CategoryComparison";
 import { CalendarCategoryFilter, TransactionTypeFilter } from "@/components/calendar/CalendarCategoryFilter";
+import { TopCategoriesSummary } from "@/components/calendar/TopCategoriesSummary";
 import { useProfile } from "@/hooks/useProfile";
 
 interface DayData {
@@ -281,7 +282,15 @@ const CalendarView = () => {
           </motion.div>
         </div>
 
-        {/* Calendar */}
+        {/* Top Categories Summary */}
+        <div className="mb-6">
+          <TopCategoriesSummary
+            transactions={transactions}
+            categories={categories}
+            currentMonth={currentMonth}
+          />
+        </div>
+
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
