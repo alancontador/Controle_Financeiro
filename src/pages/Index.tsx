@@ -6,10 +6,10 @@ import { MobileNav } from "@/components/layout/MobileNav";
 import { Header } from "@/components/dashboard/Header";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { BalanceChart } from "@/components/dashboard/BalanceChartReal";
-import { InvestmentCard } from "@/components/dashboard/InvestmentCard";
 import { GoalsCard } from "@/components/dashboard/GoalsCard";
 import { RecentTransactionsReal } from "@/components/dashboard/RecentTransactionsReal";
 import { ExpensesByCategory } from "@/components/dashboard/ExpensesByCategory";
+import { DashboardBudgetAlerts } from "@/components/dashboard/DashboardBudgetAlerts";
 import { useAuth } from "@/hooks/useAuth";
 import { useDashboardStats } from "@/hooks/useDashboardStats";
 
@@ -98,6 +98,11 @@ const Index = () => {
             icon={PiggyBank}
             delay={0.15}
           />
+        </div>
+
+        {/* Budget Alerts */}
+        <div className="mb-6">
+          <DashboardBudgetAlerts />
         </div>
 
         {/* Main Content Grid - Responsive */}
