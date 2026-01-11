@@ -5,7 +5,7 @@ import {
   Receipt, 
   TrendingUp, 
   Target, 
-  Lightbulb,
+  FileText,
   Settings,
   LogOut
 } from "lucide-react";
@@ -23,7 +23,7 @@ const navItems: NavItem[] = [
   { icon: Receipt, label: "Transações", href: "/transactions" },
   { icon: TrendingUp, label: "Investimentos", href: "/investments" },
   { icon: Target, label: "Metas", href: "/goals" },
-  { icon: Lightbulb, label: "Insights", href: "/insights" },
+  { icon: FileText, label: "Relatórios", href: "/reports" },
 ];
 
 export function Sidebar() {
