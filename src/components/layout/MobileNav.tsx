@@ -8,6 +8,7 @@ import {
   Target, 
   FileText,
   Wallet,
+  Brain,
   Settings,
   LogOut,
   Menu,
@@ -30,6 +31,7 @@ const navItems: NavItem[] = [
   { icon: TrendingUp, label: "Investimentos", href: "/investments" },
   { icon: Target, label: "Metas", href: "/goals" },
   { icon: FileText, label: "Relatórios", href: "/reports" },
+  { icon: Brain, label: "Insights", href: "/insights" },
 ];
 
 export function MobileNav() {

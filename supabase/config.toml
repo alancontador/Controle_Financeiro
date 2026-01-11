@@ -1,1 +1,4 @@
 project_id = "croxtrjubkrwdlsrizcx"
+
+[functions.analyze-finances]
+verify_jwt = false
