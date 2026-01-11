@@ -1,28 +1,37 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Loader2 } from "lucide-react";
+import { Loader2, Wallet, TrendingUp, CreditCard, PiggyBank } from "lucide-react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { MobileNav } from "@/components/layout/MobileNav";
 import { Header } from "@/components/dashboard/Header";
 import { StatCard } from "@/components/dashboard/StatCard";
-import { BalanceChart } from "@/components/dashboard/BalanceChart";
+import { BalanceChart } from "@/components/dashboard/BalanceChartReal";
 import { InvestmentCard } from "@/components/dashboard/InvestmentCard";
 import { GoalsCard } from "@/components/dashboard/GoalsCard";
-import { RecentTransactions } from "@/components/dashboard/RecentTransactions";
-import { Wallet, TrendingUp, CreditCard, PiggyBank } from "lucide-react";
+import { RecentTransactionsReal } from "@/components/dashboard/RecentTransactionsReal";
+import { ExpensesByCategory } from "@/components/dashboard/ExpensesByCategory";
 import { useAuth } from "@/hooks/useAuth";
+import { useDashboardStats } from "@/hooks/useDashboardStats";
 
 const Index = () => {
-  const { user, loading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const {
+    loading,
+    stats,
+    monthlyChartData,
+    balanceEvolution,
+    expensesByCategory,
+    recentTransactions,
+  } = useDashboardStats();
 
   useEffect(() => {
-    if (!loading && !user) {
+    if (!authLoading && !user) {
       navigate("/auth");
     }
-  }, [user, loading, navigate]);
+  }, [user, authLoading, navigate]);
 
-  if (loading) {
+  if (authLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -34,45 +43,58 @@ const Index = () => {
     return null;
   }
 
+  const formatCurrency = (value: number) => {
+    if (value >= 1000000) {
+      return `R$ ${(value / 1000000).toFixed(2)}M`;
+    } else if (value >= 1000) {
+      return `R$ ${(value / 1000).toFixed(1)}k`;
+    }
+    return `R$ ${value.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}`;
+  };
+
+  const formatChange = (value: number) => {
+    const sign = value >= 0 ? "+" : "";
+    return `${sign}${value.toFixed(1)}%`;
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Sidebar />
       <MobileNav />
-      
+
       <main className="lg:ml-64 p-4 lg:p-8 pt-20 lg:pt-8">
         <Header />
 
         {/* Stats Grid - Responsive */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6 mb-6">
           <StatCard
-            title="Patrimônio Total"
-            value="R$ 1.254.920"
-            change="+3.8%"
-            changeType="positive"
+            title="Saldo Total"
+            value={formatCurrency(stats.totalBalance)}
+            change={stats.totalBalance !== 0 ? formatChange(stats.balanceChange) : undefined}
+            changeType={stats.balanceChange >= 0 ? "positive" : "negative"}
             icon={Wallet}
             delay={0}
           />
           <StatCard
             title="Receitas do Mês"
-            value="R$ 12.800"
-            change="+8.2%"
-            changeType="positive"
+            value={formatCurrency(stats.monthlyIncome)}
+            change={stats.lastMonthIncome > 0 ? formatChange(stats.incomeChange) : undefined}
+            changeType={stats.incomeChange >= 0 ? "positive" : "negative"}
             icon={TrendingUp}
             delay={0.05}
           />
           <StatCard
             title="Despesas do Mês"
-            value="R$ 7.600"
-            change="-5.4%"
-            changeType="positive"
+            value={formatCurrency(stats.monthlyExpenses)}
+            change={stats.lastMonthExpenses > 0 ? formatChange(stats.expenseChange) : undefined}
+            changeType={stats.expenseChange <= 0 ? "positive" : "negative"}
             icon={CreditCard}
             delay={0.1}
           />
           <StatCard
-            title="Investido"
-            value="R$ 732.400"
-            change="+5.2%"
-            changeType="positive"
+            title="Saldo do Mês"
+            value={formatCurrency(stats.monthlyBalance)}
+            changeType={stats.monthlyBalance >= 0 ? "positive" : "negative"}
             icon={PiggyBank}
             delay={0.15}
           />
@@ -80,13 +102,13 @@ const Index = () => {
 
         {/* Main Content Grid - Responsive */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6 mb-6">
-          <BalanceChart />
-          <InvestmentCard />
+          <BalanceChart data={monthlyChartData} balanceEvolution={balanceEvolution} />
+          <ExpensesByCategory data={expensesByCategory} />
         </div>
 
         {/* Secondary Content Grid - Responsive */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
-          <RecentTransactions />
+          <RecentTransactionsReal transactions={recentTransactions} loading={loading} />
           <GoalsCard />
         </div>
 
