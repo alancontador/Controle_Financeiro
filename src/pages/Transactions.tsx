@@ -1,10 +1,16 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Plus, Loader2, ArrowUpRight, ArrowDownRight, Upload } from "lucide-react";
+import { Plus, Loader2, ArrowUpRight, ArrowDownRight, Upload, Download } from "lucide-react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { MobileNav } from "@/components/layout/MobileNav";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/hooks/useAuth";
 import { useTransactions, Transaction } from "@/hooks/useTransactions";
 import { TransactionFilters } from "@/components/transactions/TransactionFilters";
@@ -12,6 +18,7 @@ import { TransactionList } from "@/components/transactions/TransactionList";
 import { TransactionModal } from "@/components/transactions/TransactionModal";
 import { DeleteConfirmModal } from "@/components/transactions/DeleteConfirmModal";
 import { ImportModal } from "@/components/transactions/ImportModal";
+import { exportTransactions } from "@/utils/exportTransactions";
 
 const Transactions = () => {
   const { user, loading: authLoading } = useAuth();
@@ -148,6 +155,30 @@ const Transactions = () => {
           </div>
 
           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="w-full sm:w-auto"
+                  disabled={transactions.length === 0}
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Exportar
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onClick={() => exportTransactions(transactions, { format: "csv" })}
+                >
+                  Exportar como CSV
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => exportTransactions(transactions, { format: "xlsx" })}
+                >
+                  Exportar como Excel
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button
               variant="outline"
               onClick={() => setIsImportModalOpen(true)}
