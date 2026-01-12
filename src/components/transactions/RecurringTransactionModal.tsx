@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/select";
 import { Category } from "@/hooks/useTransactions";
 import { RecurringTransaction } from "@/hooks/useRecurringTransactions";
+import { HierarchicalCategorySelector } from "./HierarchicalCategorySelector";
 
 const formSchema = z.object({
   description: z.string().min(1, "Descrição é obrigatória").max(100),
@@ -104,7 +105,11 @@ export function RecurringTransactionModal({
     }
   }, [transaction, form, isOpen]);
 
-  const filteredCategories = categories.filter((c) => c.type === watchType);
+  // Convert categories to the format expected by HierarchicalCategorySelector
+  const categoriesWithParent = categories.map((cat) => ({
+    ...cat,
+    parent_category_id: (cat as any).parent_category_id || null,
+  }));
 
   const handleSubmit = async (data: FormData) => {
     await onSubmit({
@@ -199,23 +204,15 @@ export function RecurringTransactionModal({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Categoria</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    value={field.value || ""}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione uma categoria" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {filteredCategories.map((category) => (
-                        <SelectItem key={category.id} value={category.id}>
-                          {category.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <FormControl>
+                    <HierarchicalCategorySelector
+                      categories={categoriesWithParent}
+                      value={field.value || undefined}
+                      onValueChange={(value) => field.onChange(value || null)}
+                      type={watchType}
+                      placeholder="Selecione uma categoria"
+                    />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
