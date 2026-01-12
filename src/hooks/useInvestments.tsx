@@ -250,6 +250,38 @@ export function useInvestments() {
     },
   });
 
+  // Import investments in batch
+  const [isImporting, setIsImporting] = useState(false);
+  
+  const importInvestments = async (
+    investmentsData: Omit<Investment, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'investment_class'>[]
+  ) => {
+    if (!user?.id) throw new Error('Usuário não autenticado');
+    
+    setIsImporting(true);
+    try {
+      const dataWithUserId = investmentsData.map(inv => ({
+        ...inv,
+        user_id: user.id,
+      }));
+
+      const { error } = await supabase
+        .from('investments')
+        .insert(dataWithUserId);
+      
+      if (error) throw error;
+      
+      queryClient.invalidateQueries({ queryKey: ['investments'] });
+      toast.success(`${investmentsData.length} ativo(s) importado(s) com sucesso!`);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      toast.error('Erro ao importar ativos: ' + errorMessage);
+      throw error;
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
   // Fetch quotes from Yahoo Finance
   const [isUpdatingQuotes, setIsUpdatingQuotes] = useState(false);
   const [lastQuotesUpdate, setLastQuotesUpdate] = useState<Date | null>(() => {
@@ -514,6 +546,8 @@ export function useInvestments() {
     createInvestment: createInvestmentMutation.mutate,
     updateInvestment: updateInvestmentMutation.mutate,
     deleteInvestment: deleteInvestmentMutation.mutate,
+    importInvestments,
+    isImporting,
     
     // Quotes
     updateQuotes,

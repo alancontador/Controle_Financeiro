@@ -32,6 +32,8 @@ const Investments = () => {
     createInvestment,
     updateInvestment,
     deleteInvestment,
+    importInvestments,
+    isImporting,
     updateQuotes,
     isUpdatingQuotes,
     lastQuotesUpdate,
@@ -165,6 +167,8 @@ const Investments = () => {
             onCreateInvestment={createInvestment}
             onUpdateInvestment={updateInvestment}
             onDeleteInvestment={deleteInvestment}
+            onImportInvestments={importInvestments}
+            isImporting={isImporting}
             onUpdateQuotes={updateQuotes}
             isUpdatingQuotes={isUpdatingQuotes}
             lastQuotesUpdate={lastQuotesUpdate}
