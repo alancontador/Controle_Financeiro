@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Plus, Search, Edit, Trash2, TrendingUp, TrendingDown, Briefcase, RefreshCw, Loader2 } from "lucide-react";
+import { Plus, Search, Edit, Trash2, TrendingUp, TrendingDown, Briefcase, RefreshCw, Loader2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Investment, InvestmentClass } from "@/hooks/useInvestments";
 import { InvestmentModal } from "./InvestmentModal";
+import { InvestmentImportModal } from "./InvestmentImportModal";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,6 +24,8 @@ interface InvestmentsListProps {
   onCreateInvestment: (data: Omit<Investment, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'investment_class'>) => void;
   onUpdateInvestment: (data: Partial<Investment> & { id: string }) => void;
   onDeleteInvestment: (id: string) => void;
+  onImportInvestments: (data: Omit<Investment, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'investment_class'>[]) => Promise<void>;
+  isImporting: boolean;
   onUpdateQuotes: () => void;
   isUpdatingQuotes: boolean;
   lastQuotesUpdate: Date | null;
@@ -57,12 +60,15 @@ export function InvestmentsList({
   onCreateInvestment,
   onUpdateInvestment,
   onDeleteInvestment,
+  onImportInvestments,
+  isImporting,
   onUpdateQuotes,
   isUpdatingQuotes,
   lastQuotesUpdate,
 }: InvestmentsListProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [editingInvestment, setEditingInvestment] = useState<Investment | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
@@ -114,7 +120,7 @@ export function InvestmentsList({
             <span className="text-xs text-muted-foreground whitespace-nowrap">
               Última atualização: {formatLastUpdate(lastQuotesUpdate)}
             </span>
-            <div className="flex gap-2 w-full sm:w-auto">
+            <div className="flex gap-2 w-full sm:w-auto flex-wrap">
               <Button
                 variant="outline"
                 size="sm"
@@ -128,6 +134,20 @@ export function InvestmentsList({
                   <RefreshCw className="w-4 h-4 mr-1" />
                 )}
                 Atualizar
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsImportModalOpen(true)}
+                disabled={isImporting}
+                className="flex-1 sm:flex-none"
+              >
+                {isImporting ? (
+                  <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                ) : (
+                  <Upload className="w-4 h-4 mr-1" />
+                )}
+                Importar
               </Button>
               <Button
                 size="sm"
@@ -257,6 +277,14 @@ export function InvestmentsList({
         onSave={handleSave}
         investment={editingInvestment}
         investmentClasses={investmentClasses}
+      />
+
+      <InvestmentImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onImport={onImportInvestments}
+        investmentClasses={investmentClasses}
+        isLoading={isImporting}
       />
 
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
