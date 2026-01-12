@@ -18,13 +18,6 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -32,6 +25,7 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { Category, Transaction } from "@/hooks/useTransactions";
 import { cn } from "@/lib/utils";
+import { HierarchicalCategorySelector } from "./HierarchicalCategorySelector";
 
 const transactionSchema = z.object({
   description: z
@@ -146,7 +140,11 @@ export function TransactionModal({
     onClose();
   };
 
-  const filteredCategories = categories.filter((cat) => cat.type === watchType);
+  // Convert categories to the format expected by HierarchicalCategorySelector
+  const categoriesWithParent = categories.map((cat) => ({
+    ...cat,
+    parent_category_id: (cat as any).parent_category_id || null,
+  }));
 
   return (
     <AnimatePresence>
@@ -275,36 +273,22 @@ export function TransactionModal({
                     )}
                   />
 
-                  {/* Category */}
+                  {/* Category - Hierarchical */}
                   <FormField
                     control={form.control}
                     name="category_id"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Categoria</FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          value={field.value}
-                        >
-                          <FormControl>
-                            <SelectTrigger className="bg-secondary/50 border-border/50">
-                              <SelectValue placeholder="Selecione uma categoria" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent className="bg-card border-border">
-                            {filteredCategories.map((cat) => (
-                              <SelectItem key={cat.id} value={cat.id}>
-                                <span className="flex items-center gap-2">
-                                  <span
-                                    className="w-2 h-2 rounded-full"
-                                    style={{ backgroundColor: cat.color }}
-                                  />
-                                  {cat.name}
-                                </span>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <FormControl>
+                          <HierarchicalCategorySelector
+                            categories={categoriesWithParent}
+                            value={field.value}
+                            onValueChange={field.onChange}
+                            type={watchType}
+                            placeholder="Selecione uma categoria"
+                          />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
