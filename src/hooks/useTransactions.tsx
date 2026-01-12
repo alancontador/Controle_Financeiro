@@ -36,18 +36,78 @@ export interface TransactionFilters {
 }
 
 const defaultCategories: Omit<Category, "id" | "user_id" | "created_at">[] = [
-  { name: "Salário", icon: "Wallet", color: "#00C896", type: "income" },
-  { name: "Freelance", icon: "Briefcase", color: "#00C896", type: "income" },
-  { name: "Investimentos", icon: "TrendingUp", color: "#00C896", type: "income" },
-  { name: "Outros", icon: "Plus", color: "#00C896", type: "income" },
-  { name: "Alimentação", icon: "UtensilsCrossed", color: "#FF4F4F", type: "expense" },
-  { name: "Transporte", icon: "Car", color: "#FF4F4F", type: "expense" },
-  { name: "Moradia", icon: "Home", color: "#FF4F4F", type: "expense" },
-  { name: "Saúde", icon: "Heart", color: "#FF4F4F", type: "expense" },
-  { name: "Educação", icon: "GraduationCap", color: "#FF4F4F", type: "expense" },
-  { name: "Lazer", icon: "Gamepad2", color: "#FF4F4F", type: "expense" },
-  { name: "Compras", icon: "ShoppingBag", color: "#FF4F4F", type: "expense" },
-  { name: "Serviços", icon: "Settings", color: "#FF4F4F", type: "expense" },
+  // === RECEITAS ===
+  { name: "Renda Cliente", icon: "Users", color: "#00C896", type: "income" },
+  { name: "Renda Cônjuge", icon: "Heart", color: "#00D4AA", type: "income" },
+  { name: "Outras Fontes de Renda", icon: "CircleDollarSign", color: "#00E5BB", type: "income" },
+  { name: "Resgate de Investimentos", icon: "TrendingUp", color: "#10B981", type: "income" },
+  { name: "Transferência Mesma Titularidade", icon: "ArrowLeftRight", color: "#14B8A6", type: "income" },
+  { name: "Reembolsos", icon: "RotateCcw", color: "#06B6D4", type: "income" },
+  
+  // === DESPESAS - Pessoais ===
+  { name: "Alimentação", icon: "UtensilsCrossed", color: "#F97316", type: "expense" },
+  { name: "Casa", icon: "Home", color: "#EF4444", type: "expense" },
+  { name: "Casa de Veraneio", icon: "Palmtree", color: "#DC2626", type: "expense" },
+  { name: "Cuidados Pessoais", icon: "Sparkles", color: "#EC4899", type: "expense" },
+  { name: "Educação", icon: "GraduationCap", color: "#8B5CF6", type: "expense" },
+  { name: "Filhos e Família", icon: "Baby", color: "#F472B6", type: "expense" },
+  { name: "Impostos e Taxas", icon: "Receipt", color: "#6B7280", type: "expense" },
+  { name: "Mercado", icon: "ShoppingCart", color: "#FB923C", type: "expense" },
+  { name: "Pets", icon: "PawPrint", color: "#A78BFA", type: "expense" },
+  { name: "Prestadores de Serviço", icon: "Wrench", color: "#64748B", type: "expense" },
+  { name: "Profissional e Trabalho", icon: "Briefcase", color: "#3B82F6", type: "expense" },
+  { name: "Saúde", icon: "HeartPulse", color: "#EF4444", type: "expense" },
+  { name: "Despesas Médicas", icon: "Stethoscope", color: "#F43F5E", type: "expense" },
+  { name: "Seguros", icon: "Shield", color: "#0EA5E9", type: "expense" },
+  { name: "Transporte", icon: "Car", color: "#6366F1", type: "expense" },
+  
+  // === DESPESAS - Empresa ===
+  { name: "Serviços Financeiros", icon: "Landmark", color: "#4F46E5", type: "expense" },
+  { name: "Meios de Pagamento", icon: "CreditCard", color: "#7C3AED", type: "expense" },
+  { name: "Infraestrutura", icon: "Building2", color: "#475569", type: "expense" },
+  { name: "Ferramentas", icon: "Hammer", color: "#78716C", type: "expense" },
+  { name: "Marketing", icon: "Megaphone", color: "#F59E0B", type: "expense" },
+  { name: "Colaboradores", icon: "Users", color: "#0284C7", type: "expense" },
+  { name: "Prestadores de Serviço – Empresa", icon: "UserCog", color: "#0891B2", type: "expense" },
+  { name: "Taxas e Impostos", icon: "FileText", color: "#71717A", type: "expense" },
+  { name: "Insumos e Outros", icon: "Package", color: "#92400E", type: "expense" },
+  
+  // === DESPESAS - Lifestyle ===
+  { name: "Assinaturas e Serviços", icon: "CalendarCheck", color: "#A855F7", type: "expense" },
+  { name: "Compras", icon: "ShoppingBag", color: "#D946EF", type: "expense" },
+  { name: "Esportes", icon: "Dumbbell", color: "#22C55E", type: "expense" },
+  { name: "Lazer", icon: "Gamepad2", color: "#06B6D4", type: "expense" },
+  { name: "Presentes e Doações", icon: "Gift", color: "#E11D48", type: "expense" },
+  { name: "Restaurantes", icon: "ChefHat", color: "#EA580C", type: "expense" },
+  { name: "Tarifas Bancárias", icon: "Building", color: "#4B5563", type: "expense" },
+  { name: "Vestuário", icon: "Shirt", color: "#DB2777", type: "expense" },
+  { name: "Viagens", icon: "Plane", color: "#0EA5E9", type: "expense" },
+  { name: "Outros", icon: "MoreHorizontal", color: "#9CA3AF", type: "expense" },
+  
+  // === PROJETOS ===
+  { name: "Viagem-Projetos", icon: "MapPin", color: "#2DD4BF", type: "expense" },
+  { name: "Veículo-Projetos", icon: "Car", color: "#38BDF8", type: "expense" },
+  { name: "Casa-Projetos", icon: "HomeIcon", color: "#FB7185", type: "expense" },
+  { name: "Família-Projetos", icon: "Users2", color: "#C084FC", type: "expense" },
+  { name: "Eletrônicos-Projetos", icon: "Laptop", color: "#60A5FA", type: "expense" },
+  { name: "Educação-Projetos", icon: "BookOpen", color: "#818CF8", type: "expense" },
+  { name: "Hobby-Projetos", icon: "Palette", color: "#FB923C", type: "expense" },
+  { name: "Profissional-Projetos", icon: "Target", color: "#34D399", type: "expense" },
+  { name: "Saúde-Projetos", icon: "Activity", color: "#F87171", type: "expense" },
+  { name: "Outros-Projetos", icon: "FolderOpen", color: "#A3A3A3", type: "expense" },
+  
+  // === FINANCIAMENTOS E DÍVIDAS ===
+  { name: "Financiamento Imobiliário", icon: "Building2", color: "#BE185D", type: "expense" },
+  { name: "Financiamento Veículo", icon: "CarFront", color: "#9333EA", type: "expense" },
+  { name: "Dívidas e Empréstimos", icon: "Banknote", color: "#DC2626", type: "expense" },
+  
+  // === TRANSFERÊNCIAS E CARTÕES ===
+  { name: "Pagamento Fatura de Cartão", icon: "CreditCard", color: "#6D28D9", type: "expense" },
+  { name: "Despesas Reembolsáveis", icon: "Receipt", color: "#0369A1", type: "expense" },
+  { name: "Aplicação em Investimentos", icon: "PiggyBank", color: "#059669", type: "expense" },
+  
+  // === SEM CLASSIFICAÇÃO ===
+  { name: "Sem Classificação", icon: "HelpCircle", color: "#D4D4D4", type: "expense" },
 ];
 
 export function useTransactions() {
