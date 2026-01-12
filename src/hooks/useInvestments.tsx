@@ -1,8 +1,11 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { toast } from 'sonner';
+
+const QUOTES_UPDATE_INTERVAL = 5 * 60 * 1000; // 5 minutes in milliseconds
+const QUOTES_LAST_UPDATE_KEY = 'investments_quotes_last_update';
 
 export interface InvestmentClass {
   id: string;
@@ -249,18 +252,18 @@ export function useInvestments() {
 
   // Fetch quotes from Yahoo Finance
   const [isUpdatingQuotes, setIsUpdatingQuotes] = useState(false);
+  const [lastQuotesUpdate, setLastQuotesUpdate] = useState<Date | null>(() => {
+    const stored = localStorage.getItem(QUOTES_LAST_UPDATE_KEY);
+    return stored ? new Date(stored) : null;
+  });
+  const autoUpdateTriggeredRef = useRef(false);
   
-  const updateQuotes = async () => {
-    if (investments.length === 0) {
-      toast.info('Nenhum ativo para atualizar');
-      return;
-    }
-
+  const updateQuotesInternal = useCallback(async (silent: boolean = false) => {
     // Filter only types that can be quoted (not fixed income)
     const quotableInvestments = investments.filter(inv => inv.type !== 'fixed_income');
     
     if (quotableInvestments.length === 0) {
-      toast.info('Nenhum ativo com cotação disponível');
+      if (!silent) toast.info('Nenhum ativo com cotação disponível');
       return;
     }
 
@@ -311,19 +314,75 @@ export function useInvestments() {
       // Invalidate to refresh the UI
       queryClient.invalidateQueries({ queryKey: ['investments'] });
 
-      if (updatedCount > 0) {
-        toast.success(`${updatedCount} cotação(ões) atualizada(s)${errorCount > 0 ? ` (${errorCount} erro(s))` : ''}`);
-      } else if (errorCount > 0) {
-        toast.error(`Não foi possível atualizar as cotações (${errorCount} erro(s))`);
+      // Update last update timestamp
+      const now = new Date();
+      setLastQuotesUpdate(now);
+      localStorage.setItem(QUOTES_LAST_UPDATE_KEY, now.toISOString());
+
+      if (!silent) {
+        if (updatedCount > 0) {
+          toast.success(`${updatedCount} cotação(ões) atualizada(s)${errorCount > 0 ? ` (${errorCount} erro(s))` : ''}`);
+        } else if (errorCount > 0) {
+          toast.error(`Não foi possível atualizar as cotações (${errorCount} erro(s))`);
+        }
+      } else if (updatedCount > 0) {
+        // Silent toast for auto-update
+        toast.success(`Cotações atualizadas automaticamente`, { duration: 2000 });
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
       console.error('Error updating quotes:', errorMessage);
-      toast.error('Erro ao atualizar cotações: ' + errorMessage);
+      if (!silent) {
+        toast.error('Erro ao atualizar cotações: ' + errorMessage);
+      }
     } finally {
       setIsUpdatingQuotes(false);
     }
-  };
+  }, [investments, queryClient]);
+
+  const updateQuotes = useCallback(() => {
+    if (investments.length === 0) {
+      toast.info('Nenhum ativo para atualizar');
+      return;
+    }
+    updateQuotesInternal(false);
+  }, [investments.length, updateQuotesInternal]);
+
+  // Auto-update quotes on page load if needed
+  useEffect(() => {
+    if (loadingInvestments || autoUpdateTriggeredRef.current) return;
+    if (investments.length === 0) return;
+    
+    const quotableInvestments = investments.filter(inv => inv.type !== 'fixed_income');
+    if (quotableInvestments.length === 0) return;
+
+    const shouldUpdate = () => {
+      if (!lastQuotesUpdate) return true;
+      const timeSinceUpdate = Date.now() - lastQuotesUpdate.getTime();
+      return timeSinceUpdate > QUOTES_UPDATE_INTERVAL;
+    };
+
+    if (shouldUpdate()) {
+      autoUpdateTriggeredRef.current = true;
+      console.log('Auto-updating quotes...');
+      updateQuotesInternal(true);
+    }
+  }, [loadingInvestments, investments, lastQuotesUpdate, updateQuotesInternal]);
+
+  // Set up interval for auto-update while on page
+  useEffect(() => {
+    if (investments.length === 0) return;
+    
+    const quotableInvestments = investments.filter(inv => inv.type !== 'fixed_income');
+    if (quotableInvestments.length === 0) return;
+
+    const intervalId = setInterval(() => {
+      console.log('Interval: Auto-updating quotes...');
+      updateQuotesInternal(true);
+    }, QUOTES_UPDATE_INTERVAL);
+
+    return () => clearInterval(intervalId);
+  }, [investments, updateQuotesInternal]);
 
   // Calculate totals
   const totalValue = useMemo(() => {
@@ -459,6 +518,7 @@ export function useInvestments() {
     // Quotes
     updateQuotes,
     isUpdatingQuotes,
+    lastQuotesUpdate,
     
     // Calculations
     totalValue,

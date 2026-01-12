@@ -25,6 +25,7 @@ interface InvestmentsListProps {
   onDeleteInvestment: (id: string) => void;
   onUpdateQuotes: () => void;
   isUpdatingQuotes: boolean;
+  lastQuotesUpdate: Date | null;
 }
 
 const typeLabels: Record<Investment['type'], string> = {
@@ -37,6 +38,19 @@ const typeLabels: Record<Investment['type'], string> = {
   etf_us: 'ETF EUA',
 };
 
+function formatLastUpdate(date: Date | null): string {
+  if (!date) return 'Nunca';
+  const now = new Date();
+  const diff = now.getTime() - date.getTime();
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  
+  if (minutes < 1) return 'Agora';
+  if (minutes < 60) return `${minutes}min atrás`;
+  if (hours < 24) return `${hours}h atrás`;
+  return date.toLocaleDateString('pt-BR');
+}
+
 export function InvestmentsList({
   investments,
   investmentClasses,
@@ -45,6 +59,7 @@ export function InvestmentsList({
   onDeleteInvestment,
   onUpdateQuotes,
   isUpdatingQuotes,
+  lastQuotesUpdate,
 }: InvestmentsListProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -85,7 +100,7 @@ export function InvestmentsList({
         transition={{ delay: 0.2 }}
         className="glass-card rounded-xl p-6"
       >
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center">
               <Briefcase className="w-5 h-5 text-accent" />
@@ -95,28 +110,37 @@ export function InvestmentsList({
               <p className="text-muted-foreground text-sm">{investments.length} ativos cadastrados</p>
             </div>
           </div>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={onUpdateQuotes}
-              disabled={isUpdatingQuotes || investments.length === 0}
-            >
-              {isUpdatingQuotes ? (
-                <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-              ) : (
-                <RefreshCw className="w-4 h-4 mr-1" />
-              )}
-              Atualizar Cotações
-            </Button>
-            <Button
-              onClick={() => {
-                setEditingInvestment(null);
-                setIsModalOpen(true);
-              }}
-            >
-              <Plus className="w-4 h-4 mr-1" />
-              Adicionar
-            </Button>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full sm:w-auto">
+            <span className="text-xs text-muted-foreground whitespace-nowrap">
+              Última atualização: {formatLastUpdate(lastQuotesUpdate)}
+            </span>
+            <div className="flex gap-2 w-full sm:w-auto">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onUpdateQuotes}
+                disabled={isUpdatingQuotes || investments.length === 0}
+                className="flex-1 sm:flex-none"
+              >
+                {isUpdatingQuotes ? (
+                  <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-4 h-4 mr-1" />
+                )}
+                Atualizar
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => {
+                  setEditingInvestment(null);
+                  setIsModalOpen(true);
+                }}
+                className="flex-1 sm:flex-none"
+              >
+                <Plus className="w-4 h-4 mr-1" />
+                Adicionar
+              </Button>
+            </div>
           </div>
         </div>
 

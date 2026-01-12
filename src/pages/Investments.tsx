@@ -34,6 +34,7 @@ const Investments = () => {
     deleteInvestment,
     updateQuotes,
     isUpdatingQuotes,
+    lastQuotesUpdate,
     isLoading,
   } = useInvestments();
 
@@ -166,6 +167,7 @@ const Investments = () => {
             onDeleteInvestment={deleteInvestment}
             onUpdateQuotes={updateQuotes}
             isUpdatingQuotes={isUpdatingQuotes}
+            lastQuotesUpdate={lastQuotesUpdate}
           />
         </div>
 
