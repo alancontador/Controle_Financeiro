@@ -93,6 +93,50 @@ export type Database = {
           },
         ]
       }
+      dividends: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          investment_id: string | null
+          notes: string | null
+          payment_date: string
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          investment_id?: string | null
+          notes?: string | null
+          payment_date: string
+          type?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          investment_id?: string | null
+          notes?: string | null
+          payment_date?: string
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dividends_investment_id_fkey"
+            columns: ["investment_id"]
+            isOneToOne: false
+            referencedRelation: "investments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       goals: {
         Row: {
           category: string | null

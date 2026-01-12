@@ -8,6 +8,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { useInvestments } from "@/hooks/useInvestments";
 import { PortfolioOverview } from "@/components/investments/PortfolioOverview";
 import { PortfolioHistoryChart } from "@/components/investments/PortfolioHistoryChart";
+import { PerformanceVsBenchmarks } from "@/components/investments/PerformanceVsBenchmarks";
+import { RebalancingAlerts } from "@/components/investments/RebalancingAlerts";
+import { DividendsWidget } from "@/components/investments/DividendsWidget";
 import { RetirementSimulator } from "@/components/investments/RetirementSimulator";
 import { ProjectionChart } from "@/components/investments/ProjectionChart";
 import { AssetComparison } from "@/components/investments/AssetComparison";
@@ -21,6 +24,7 @@ const Investments = () => {
     allocationByClass,
     investments,
     totalValue,
+    totalInvested,
     averageMonthlyReturn,
     simulation,
     updateSimulation,
@@ -40,6 +44,11 @@ const Investments = () => {
     lastQuotesUpdate,
     portfolioHistory,
     loadingHistory,
+    dividends,
+    loadingDividends,
+    createDividend,
+    updateDividend,
+    deleteDividend,
     isLoading,
   } = useInvestments();
 
@@ -178,12 +187,34 @@ const Investments = () => {
           />
         </div>
 
-        {/* Portfolio History Chart - Full Width */}
-        <div className="mb-6">
+        {/* Portfolio History & Performance */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           <PortfolioHistoryChart
             history={portfolioHistory}
             currentValue={totalValue}
             isLoading={loadingHistory}
+          />
+          <PerformanceVsBenchmarks
+            portfolioHistory={portfolioHistory}
+            isLoading={loadingHistory}
+          />
+        </div>
+
+        {/* Rebalancing & Dividends */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          <RebalancingAlerts
+            allocationByClass={allocationByClass}
+            totalValue={totalValue}
+            threshold={1}
+          />
+          <DividendsWidget
+            dividends={dividends}
+            investments={investments}
+            totalInvested={totalInvested}
+            onCreateDividend={createDividend}
+            onUpdateDividend={updateDividend}
+            onDeleteDividend={deleteDividend}
+            isLoading={loadingDividends}
           />
         </div>
 
