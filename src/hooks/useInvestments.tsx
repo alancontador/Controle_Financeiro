@@ -44,6 +44,19 @@ export interface Investment {
   investment_class?: InvestmentClass;
 }
 
+export interface Dividend {
+  id: string;
+  user_id: string;
+  investment_id: string | null;
+  amount: number;
+  payment_date: string;
+  type: 'dividend' | 'jcp' | 'rental';
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  investment?: Investment;
+}
+
 export interface RetirementSimulation {
   currentAge: number;
   retirementAge: number;
@@ -451,6 +464,94 @@ export function useInvestments() {
     enabled: !!user?.id,
   });
 
+  // Fetch dividends
+  const { data: dividends = [], isLoading: loadingDividends } = useQuery({
+    queryKey: ['dividends', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const { data, error } = await supabase
+        .from('dividends')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('payment_date', { ascending: false });
+      
+      if (error) throw error;
+      return data as Dividend[];
+    },
+    enabled: !!user?.id,
+  });
+
+  // Create dividend
+  const createDividendMutation = useMutation({
+    mutationFn: async (data: Omit<Dividend, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'investment'>) => {
+      if (!user?.id) throw new Error('Usuário não autenticado');
+      const { data: result, error } = await supabase
+        .from('dividends')
+        .insert({ ...data, user_id: user.id })
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['dividends'] });
+      toast.success('Dividendo registrado com sucesso!');
+    },
+    onError: (error) => {
+      toast.error('Erro ao registrar dividendo: ' + error.message);
+    },
+  });
+
+  // Update dividend
+  const updateDividendMutation = useMutation({
+    mutationFn: async ({ id, ...data }: Partial<Dividend> & { id: string }) => {
+      const { data: result, error } = await supabase
+        .from('dividends')
+        .update(data)
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['dividends'] });
+      toast.success('Dividendo atualizado!');
+    },
+    onError: (error) => {
+      toast.error('Erro ao atualizar dividendo: ' + error.message);
+    },
+  });
+
+  // Delete dividend
+  const deleteDividendMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('dividends')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['dividends'] });
+      toast.success('Dividendo excluído!');
+    },
+    onError: (error) => {
+      toast.error('Erro ao excluir dividendo: ' + error.message);
+    },
+  });
+
+  // Total invested (cost basis)
+  const totalInvested = useMemo(() => {
+    return investments.reduce((acc, inv) => {
+      const cost = inv.quantity * inv.average_price;
+      return acc + (inv.currency === 'USD' ? cost * 5.0 : cost);
+    }, 0);
+  }, [investments]);
+
   // Save today's portfolio snapshot
   const savePortfolioSnapshotRef = useRef(false);
   
@@ -614,6 +715,14 @@ export function useInvestments() {
     deleteInvestment: deleteInvestmentMutation.mutate,
     importInvestments,
     isImporting,
+    
+    // Dividends
+    dividends,
+    loadingDividends,
+    createDividend: createDividendMutation.mutate,
+    updateDividend: updateDividendMutation.mutate,
+    deleteDividend: deleteDividendMutation.mutate,
+    totalInvested,
     
     // Quotes
     updateQuotes,
