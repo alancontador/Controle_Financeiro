@@ -1,12 +1,19 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Plus, Search, Edit, Trash2, TrendingUp, TrendingDown, Briefcase, RefreshCw, Loader2, Upload } from "lucide-react";
+import { Plus, Search, Edit, Trash2, TrendingUp, TrendingDown, Briefcase, RefreshCw, Loader2, Upload, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Investment, InvestmentClass } from "@/hooks/useInvestments";
 import { InvestmentModal } from "./InvestmentModal";
 import { InvestmentImportModal } from "./InvestmentImportModal";
+import { exportInvestments } from "@/utils/exportInvestments";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -149,6 +156,27 @@ export function InvestmentsList({
                 )}
                 Importar
               </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={investments.length === 0}
+                    className="flex-1 sm:flex-none"
+                  >
+                    <Download className="w-4 h-4 mr-1" />
+                    Exportar
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => exportInvestments(investments, investmentClasses, { format: "xlsx" })}>
+                    Exportar como Excel (.xlsx)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => exportInvestments(investments, investmentClasses, { format: "csv" })}>
+                    Exportar como CSV (.csv)
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <Button
                 size="sm"
                 onClick={() => {

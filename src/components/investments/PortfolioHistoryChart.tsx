@@ -1,9 +1,12 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from "recharts";
 import { TrendingUp, TrendingDown, Calendar, Info } from "lucide-react";
-import { format, parseISO, subMonths } from "date-fns";
+import { format, parseISO, subDays, subMonths, subYears } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { Button } from "@/components/ui/button";
+
+type PeriodFilter = "7d" | "30d" | "90d" | "1y" | "all";
 
 interface PortfolioHistoryPoint {
   id: string;
@@ -17,11 +20,47 @@ interface PortfolioHistoryChartProps {
   isLoading?: boolean;
 }
 
-export function PortfolioHistoryChart({ history, currentValue, isLoading }: PortfolioHistoryChartProps) {
-  const chartData = useMemo(() => {
-    if (history.length === 0) return [];
+const periodFilters: { label: string; value: PeriodFilter }[] = [
+  { label: "7D", value: "7d" },
+  { label: "30D", value: "30d" },
+  { label: "90D", value: "90d" },
+  { label: "1A", value: "1y" },
+  { label: "Tudo", value: "all" },
+];
 
-    return history
+export function PortfolioHistoryChart({ history, currentValue, isLoading }: PortfolioHistoryChartProps) {
+  const [selectedPeriod, setSelectedPeriod] = useState<PeriodFilter>("all");
+
+  const filteredHistory = useMemo(() => {
+    if (history.length === 0 || selectedPeriod === "all") return history;
+
+    const now = new Date();
+    let cutoffDate: Date;
+
+    switch (selectedPeriod) {
+      case "7d":
+        cutoffDate = subDays(now, 7);
+        break;
+      case "30d":
+        cutoffDate = subDays(now, 30);
+        break;
+      case "90d":
+        cutoffDate = subDays(now, 90);
+        break;
+      case "1y":
+        cutoffDate = subYears(now, 1);
+        break;
+      default:
+        return history;
+    }
+
+    return history.filter((point) => new Date(point.snapshot_date) >= cutoffDate);
+  }, [history, selectedPeriod]);
+
+  const chartData = useMemo(() => {
+    if (filteredHistory.length === 0) return [];
+
+    return filteredHistory
       .sort((a, b) => new Date(a.snapshot_date).getTime() - new Date(b.snapshot_date).getTime())
       .map((point) => ({
         date: point.snapshot_date,
@@ -29,7 +68,7 @@ export function PortfolioHistoryChart({ history, currentValue, isLoading }: Port
         formattedDate: format(parseISO(point.snapshot_date), "dd/MM/yy", { locale: ptBR }),
         fullDate: format(parseISO(point.snapshot_date), "dd 'de' MMMM 'de' yyyy", { locale: ptBR }),
       }));
-  }, [history]);
+  }, [filteredHistory]);
 
   const stats = useMemo(() => {
     if (chartData.length < 2) {
@@ -147,7 +186,7 @@ export function PortfolioHistoryChart({ history, currentValue, isLoading }: Port
       animate={{ opacity: 1, y: 0 }}
       className="glass-card p-6"
     >
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
             <TrendingUp className="w-5 h-5 text-primary" />
@@ -159,21 +198,38 @@ export function PortfolioHistoryChart({ history, currentValue, isLoading }: Port
             </p>
           </div>
         </div>
-        <div className="text-right">
-          <div className="flex items-center gap-1 justify-end">
-            {isPositive ? (
-              <TrendingUp className="w-4 h-4 text-accent" />
-            ) : (
-              <TrendingDown className="w-4 h-4 text-destructive" />
-            )}
-            <span className={`text-sm font-semibold ${isPositive ? 'text-accent' : 'text-destructive'}`}>
-              {isPositive ? '+' : ''}{stats.variationPercent.toFixed(2)}%
-            </span>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            {isPositive ? '+' : ''}R$ {stats.variation.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-          </p>
+        
+        {/* Period Filters */}
+        <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-lg">
+          {periodFilters.map((filter) => (
+            <Button
+              key={filter.value}
+              variant={selectedPeriod === filter.value ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setSelectedPeriod(filter.value)}
+              className="h-7 px-3 text-xs"
+            >
+              {filter.label}
+            </Button>
+          ))}
         </div>
+      </div>
+
+      {/* Variation Stats */}
+      <div className="flex items-center justify-end gap-2 mb-4">
+        <div className="flex items-center gap-1">
+          {isPositive ? (
+            <TrendingUp className="w-4 h-4 text-accent" />
+          ) : (
+            <TrendingDown className="w-4 h-4 text-destructive" />
+          )}
+          <span className={`text-sm font-semibold ${isPositive ? 'text-accent' : 'text-destructive'}`}>
+            {isPositive ? '+' : ''}{stats.variationPercent.toFixed(2)}%
+          </span>
+        </div>
+        <span className="text-xs text-muted-foreground">
+          ({isPositive ? '+' : ''}R$ {stats.variation.toLocaleString("pt-BR", { minimumFractionDigits: 2 })})
+        </span>
       </div>
 
       {/* Stats Summary */}
