@@ -13,7 +13,8 @@ import {
   Settings,
   LogOut,
   Menu,
-  X
+  X,
+  Tag,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -30,6 +31,7 @@ const navItems: NavItem[] = [
   { icon: Receipt, label: "Transações", href: "/transactions" },
   { icon: CalendarDays, label: "Calendário", href: "/calendar" },
   { icon: Wallet, label: "Orçamentos", href: "/budgets" },
+  { icon: Tag, label: "Categorias", href: "/categories" },
   { icon: TrendingUp, label: "Investimentos", href: "/investments" },
   { icon: Target, label: "Metas", href: "/goals" },
   { icon: FileText, label: "Relatórios", href: "/reports" },
