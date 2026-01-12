@@ -34,12 +34,35 @@ import { Category, Transaction } from "@/hooks/useTransactions";
 import { cn } from "@/lib/utils";
 
 const transactionSchema = z.object({
-  description: z.string().min(1, "Descrição é obrigatória"),
-  amount: z.string().min(1, "Valor é obrigatório"),
+  description: z
+    .string()
+    .trim()
+    .min(1, "Descrição é obrigatória")
+    .max(100, "Descrição deve ter no máximo 100 caracteres"),
+  amount: z
+    .string()
+    .min(1, "Valor é obrigatório")
+    .refine(
+      (val) => {
+        const num = parseFloat(val.replace(",", "."));
+        return !isNaN(num) && num > 0;
+      },
+      { message: "Valor deve ser um número positivo" }
+    )
+    .refine(
+      (val) => {
+        const num = parseFloat(val.replace(",", "."));
+        return num <= 999999999.99;
+      },
+      { message: "Valor máximo excedido" }
+    ),
   type: z.enum(["income", "expense"]),
   category_id: z.string().optional(),
-  date: z.date(),
-  notes: z.string().optional(),
+  date: z.date({ required_error: "Data é obrigatória" }),
+  notes: z
+    .string()
+    .max(500, "Observações devem ter no máximo 500 caracteres")
+    .optional(),
 });
 
 type TransactionFormData = z.infer<typeof transactionSchema>;
@@ -81,6 +104,13 @@ export function TransactionModal({
   });
 
   const watchType = form.watch("type");
+
+  // Reset category when type changes (only if not editing)
+  useEffect(() => {
+    if (!transaction) {
+      form.setValue("category_id", undefined);
+    }
+  }, [watchType, form, transaction]);
 
   useEffect(() => {
     if (transaction) {
@@ -228,7 +258,13 @@ export function TransactionModal({
                           <Input
                             placeholder="0,00"
                             className="bg-secondary/50 border-border/50"
+                            inputMode="decimal"
                             {...field}
+                            onChange={(e) => {
+                              // Allow only numbers, comma and dot
+                              const value = e.target.value.replace(/[^0-9.,]/g, "");
+                              field.onChange(value);
+                            }}
                           />
                         </FormControl>
                         <FormMessage />
