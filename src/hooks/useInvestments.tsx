@@ -247,6 +247,84 @@ export function useInvestments() {
     },
   });
 
+  // Fetch quotes from Yahoo Finance
+  const [isUpdatingQuotes, setIsUpdatingQuotes] = useState(false);
+  
+  const updateQuotes = async () => {
+    if (investments.length === 0) {
+      toast.info('Nenhum ativo para atualizar');
+      return;
+    }
+
+    // Filter only types that can be quoted (not fixed income)
+    const quotableInvestments = investments.filter(inv => inv.type !== 'fixed_income');
+    
+    if (quotableInvestments.length === 0) {
+      toast.info('Nenhum ativo com cotação disponível');
+      return;
+    }
+
+    setIsUpdatingQuotes(true);
+    
+    try {
+      const tickers = quotableInvestments.map(inv => ({
+        ticker: inv.ticker,
+        type: inv.type,
+      }));
+
+      const { data, error } = await supabase.functions.invoke('fetch-quotes', {
+        body: { tickers },
+      });
+
+      if (error) throw error;
+
+      const quotes = data?.quotes || [];
+      let updatedCount = 0;
+      let errorCount = 0;
+
+      // Update each investment with the new price
+      for (const quote of quotes) {
+        if (quote.price !== null) {
+          const investment = quotableInvestments.find(inv => 
+            inv.ticker.toUpperCase() === quote.ticker.toUpperCase()
+          );
+          
+          if (investment) {
+            const { error: updateError } = await supabase
+              .from('investments')
+              .update({ current_price: quote.price })
+              .eq('id', investment.id);
+            
+            if (updateError) {
+              console.error(`Error updating ${quote.ticker}:`, updateError);
+              errorCount++;
+            } else {
+              updatedCount++;
+            }
+          }
+        } else if (quote.error) {
+          console.warn(`Quote error for ${quote.ticker}: ${quote.error}`);
+          errorCount++;
+        }
+      }
+
+      // Invalidate to refresh the UI
+      queryClient.invalidateQueries({ queryKey: ['investments'] });
+
+      if (updatedCount > 0) {
+        toast.success(`${updatedCount} cotação(ões) atualizada(s)${errorCount > 0 ? ` (${errorCount} erro(s))` : ''}`);
+      } else if (errorCount > 0) {
+        toast.error(`Não foi possível atualizar as cotações (${errorCount} erro(s))`);
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      console.error('Error updating quotes:', errorMessage);
+      toast.error('Erro ao atualizar cotações: ' + errorMessage);
+    } finally {
+      setIsUpdatingQuotes(false);
+    }
+  };
+
   // Calculate totals
   const totalValue = useMemo(() => {
     return investments.reduce((acc, inv) => {
@@ -377,6 +455,10 @@ export function useInvestments() {
     createInvestment: createInvestmentMutation.mutate,
     updateInvestment: updateInvestmentMutation.mutate,
     deleteInvestment: deleteInvestmentMutation.mutate,
+    
+    // Quotes
+    updateQuotes,
+    isUpdatingQuotes,
     
     // Calculations
     totalValue,
