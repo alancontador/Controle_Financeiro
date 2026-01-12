@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -11,9 +11,14 @@ export interface Category {
   color: string;
   type: "income" | "expense";
   created_at: string;
+  parent_category_id: string | null;
 }
 
-export const defaultCategories: Omit<Category, "id" | "user_id" | "created_at">[] = [
+export interface CategoryWithChildren extends Category {
+  children: CategoryWithChildren[];
+}
+
+export const defaultCategories: Omit<Category, "id" | "user_id" | "created_at" | "parent_category_id">[] = [
   // === RECEITAS ===
   { name: "Renda Cliente", icon: "Users", color: "#00C896", type: "income" },
   { name: "Renda Cônjuge", icon: "Heart", color: "#00D4AA", type: "income" },
@@ -94,6 +99,41 @@ export function useCategories() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Build hierarchical tree from flat list
+  const categoriesTree = useMemo(() => {
+    const map = new Map<string, CategoryWithChildren>();
+    const roots: CategoryWithChildren[] = [];
+
+    // First pass: create all nodes
+    categories.forEach((cat) => {
+      map.set(cat.id, { ...cat, children: [] });
+    });
+
+    // Second pass: build tree
+    categories.forEach((cat) => {
+      const node = map.get(cat.id)!;
+      if (cat.parent_category_id && map.has(cat.parent_category_id)) {
+        map.get(cat.parent_category_id)!.children.push(node);
+      } else {
+        roots.push(node);
+      }
+    });
+
+    // Sort children by name
+    const sortChildren = (nodes: CategoryWithChildren[]) => {
+      nodes.sort((a, b) => a.name.localeCompare(b.name));
+      nodes.forEach((n) => sortChildren(n.children));
+    };
+    sortChildren(roots);
+
+    return roots;
+  }, [categories]);
+
+  // Get parent categories (categories without parent)
+  const parentCategories = useMemo(() => {
+    return categories.filter((c) => !c.parent_category_id);
+  }, [categories]);
+
   const fetchCategories = useCallback(async () => {
     if (!user) return;
 
@@ -130,6 +170,7 @@ export function useCategories() {
       const categoriesToInsert = defaultCategories.map((cat) => ({
         ...cat,
         user_id: user.id,
+        parent_category_id: null,
       }));
 
       const { error } = await supabase
@@ -181,6 +222,7 @@ export function useCategories() {
       const categoriesToInsert = newCategories.map((cat) => ({
         ...cat,
         user_id: user.id,
+        parent_category_id: null,
       }));
 
       const { error: insertError } = await supabase
@@ -248,6 +290,38 @@ export function useCategories() {
   ) => {
     if (!user) return null;
 
+    // Prevent circular reference
+    if (updates.parent_category_id === id) {
+      toast({
+        title: "Erro",
+        description: "Uma categoria não pode ser sua própria subcategoria.",
+        variant: "destructive",
+      });
+      return null;
+    }
+
+    // Check if trying to set parent as one of its children
+    if (updates.parent_category_id) {
+      const isChild = (parentId: string, targetId: string): boolean => {
+        const children = categories.filter((c) => c.parent_category_id === parentId);
+        for (const child of children) {
+          if (child.id === targetId || isChild(child.id, targetId)) {
+            return true;
+          }
+        }
+        return false;
+      };
+
+      if (isChild(id, updates.parent_category_id)) {
+        toast({
+          title: "Erro",
+          description: "Não é possível mover uma categoria para dentro de uma de suas subcategorias.",
+          variant: "destructive",
+        });
+        return null;
+      }
+    }
+
     const { data, error } = await supabase
       .from("categories")
       .update(updates)
@@ -277,6 +351,17 @@ export function useCategories() {
 
   const deleteCategory = async (id: string) => {
     if (!user) return false;
+
+    // Check if category has children
+    const hasChildren = categories.some((c) => c.parent_category_id === id);
+    if (hasChildren) {
+      toast({
+        title: "Não é possível excluir",
+        description: "Esta categoria possui subcategorias. Remova as subcategorias primeiro.",
+        variant: "destructive",
+      });
+      return false;
+    }
 
     // Check if category is in use
     const { data: transactions } = await supabase
@@ -317,17 +402,41 @@ export function useCategories() {
     return true;
   };
 
+  // Get full path of a category (for display)
+  const getCategoryPath = useCallback((categoryId: string): string => {
+    const paths: string[] = [];
+    let current = categories.find((c) => c.id === categoryId);
+    
+    while (current) {
+      paths.unshift(current.name);
+      current = current.parent_category_id 
+        ? categories.find((c) => c.id === current!.parent_category_id)
+        : undefined;
+    }
+    
+    return paths.join(" > ");
+  }, [categories]);
+
+  // Get children of a category
+  const getChildren = useCallback((categoryId: string): Category[] => {
+    return categories.filter((c) => c.parent_category_id === categoryId);
+  }, [categories]);
+
   useEffect(() => {
     initializeCategories();
   }, [initializeCategories]);
 
   return {
     categories,
+    categoriesTree,
+    parentCategories,
     loading,
     addCategory,
     updateCategory,
     deleteCategory,
     syncDefaultCategories,
+    getCategoryPath,
+    getChildren,
     refetch: fetchCategories,
   };
 }
