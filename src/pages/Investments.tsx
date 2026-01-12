@@ -7,6 +7,7 @@ import { MobileNav } from "@/components/layout/MobileNav";
 import { useAuth } from "@/hooks/useAuth";
 import { useInvestments } from "@/hooks/useInvestments";
 import { PortfolioOverview } from "@/components/investments/PortfolioOverview";
+import { PortfolioHistoryChart } from "@/components/investments/PortfolioHistoryChart";
 import { RetirementSimulator } from "@/components/investments/RetirementSimulator";
 import { ProjectionChart } from "@/components/investments/ProjectionChart";
 import { AssetComparison } from "@/components/investments/AssetComparison";
@@ -37,6 +38,8 @@ const Investments = () => {
     updateQuotes,
     isUpdatingQuotes,
     lastQuotesUpdate,
+    portfolioHistory,
+    loadingHistory,
     isLoading,
   } = useInvestments();
 
@@ -172,6 +175,15 @@ const Investments = () => {
             onUpdateQuotes={updateQuotes}
             isUpdatingQuotes={isUpdatingQuotes}
             lastQuotesUpdate={lastQuotesUpdate}
+          />
+        </div>
+
+        {/* Portfolio History Chart - Full Width */}
+        <div className="mb-6">
+          <PortfolioHistoryChart
+            history={portfolioHistory}
+            currentValue={totalValue}
+            isLoading={loadingHistory}
           />
         </div>
 

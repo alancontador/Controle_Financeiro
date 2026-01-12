@@ -3,9 +3,18 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { toast } from 'sonner';
+import { format } from 'date-fns';
 
 const QUOTES_UPDATE_INTERVAL = 5 * 60 * 1000; // 5 minutes in milliseconds
 const QUOTES_LAST_UPDATE_KEY = 'investments_quotes_last_update';
+
+export interface PortfolioHistoryPoint {
+  id: string;
+  user_id: string;
+  total_value: number;
+  snapshot_date: string;
+  created_at: string;
+}
 
 export interface InvestmentClass {
   id: string;
@@ -425,6 +434,63 @@ export function useInvestments() {
     }, 0);
   }, [investments]);
 
+  // Fetch portfolio history
+  const { data: portfolioHistory = [], isLoading: loadingHistory } = useQuery({
+    queryKey: ['portfolio-history', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const { data, error } = await supabase
+        .from('portfolio_history')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('snapshot_date', { ascending: true });
+      
+      if (error) throw error;
+      return data as PortfolioHistoryPoint[];
+    },
+    enabled: !!user?.id,
+  });
+
+  // Save today's portfolio snapshot
+  const savePortfolioSnapshotRef = useRef(false);
+  
+  useEffect(() => {
+    if (!user?.id || loadingInvestments || savePortfolioSnapshotRef.current) return;
+    if (totalValue <= 0) return;
+
+    const today = format(new Date(), 'yyyy-MM-dd');
+    const alreadyHasToday = portfolioHistory.some(p => p.snapshot_date === today);
+    
+    if (alreadyHasToday) return;
+
+    savePortfolioSnapshotRef.current = true;
+
+    const saveSnapshot = async () => {
+      try {
+        const { error } = await supabase
+          .from('portfolio_history')
+          .upsert({
+            user_id: user.id,
+            snapshot_date: today,
+            total_value: totalValue,
+          }, {
+            onConflict: 'user_id,snapshot_date',
+          });
+
+        if (error) {
+          console.error('Error saving portfolio snapshot:', error);
+        } else {
+          console.log('Portfolio snapshot saved for', today);
+          queryClient.invalidateQueries({ queryKey: ['portfolio-history'] });
+        }
+      } catch (error) {
+        console.error('Error saving portfolio snapshot:', error);
+      }
+    };
+
+    saveSnapshot();
+  }, [user?.id, totalValue, loadingInvestments, portfolioHistory, queryClient]);
+
   // Calculate allocation by class
   const allocationByClass = useMemo(() => {
     const allocations: Record<string, { name: string; value: number; color: string; target: number }> = {};
@@ -553,6 +619,10 @@ export function useInvestments() {
     updateQuotes,
     isUpdatingQuotes,
     lastQuotesUpdate,
+    
+    // Portfolio history
+    portfolioHistory,
+    loadingHistory,
     
     // Calculations
     totalValue,
