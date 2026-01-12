@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.process-recurring-transactions]
 verify_jwt = false
+
+[functions.fetch-quotes]
+verify_jwt = false

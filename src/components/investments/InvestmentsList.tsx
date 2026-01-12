@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Plus, Search, Edit, Trash2, TrendingUp, TrendingDown, Briefcase } from "lucide-react";
+import { Plus, Search, Edit, Trash2, TrendingUp, TrendingDown, Briefcase, RefreshCw, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +23,8 @@ interface InvestmentsListProps {
   onCreateInvestment: (data: Omit<Investment, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'investment_class'>) => void;
   onUpdateInvestment: (data: Partial<Investment> & { id: string }) => void;
   onDeleteInvestment: (id: string) => void;
+  onUpdateQuotes: () => void;
+  isUpdatingQuotes: boolean;
 }
 
 const typeLabels: Record<Investment['type'], string> = {
@@ -41,6 +43,8 @@ export function InvestmentsList({
   onCreateInvestment,
   onUpdateInvestment,
   onDeleteInvestment,
+  onUpdateQuotes,
+  isUpdatingQuotes,
 }: InvestmentsListProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -91,15 +95,29 @@ export function InvestmentsList({
               <p className="text-muted-foreground text-sm">{investments.length} ativos cadastrados</p>
             </div>
           </div>
-          <Button
-            onClick={() => {
-              setEditingInvestment(null);
-              setIsModalOpen(true);
-            }}
-          >
-            <Plus className="w-4 h-4 mr-1" />
-            Adicionar
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={onUpdateQuotes}
+              disabled={isUpdatingQuotes || investments.length === 0}
+            >
+              {isUpdatingQuotes ? (
+                <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+              ) : (
+                <RefreshCw className="w-4 h-4 mr-1" />
+              )}
+              Atualizar Cotações
+            </Button>
+            <Button
+              onClick={() => {
+                setEditingInvestment(null);
+                setIsModalOpen(true);
+              }}
+            >
+              <Plus className="w-4 h-4 mr-1" />
+              Adicionar
+            </Button>
+          </div>
         </div>
 
         {/* Search */}
