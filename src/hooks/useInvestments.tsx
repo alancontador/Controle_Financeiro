@@ -1,13 +1,35 @@
 import { useState, useMemo } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from './useAuth';
+import { toast } from 'sonner';
 
-export interface InvestmentAsset {
+export interface InvestmentClass {
   id: string;
+  user_id: string;
   name: string;
-  type: 'stocks' | 'fixed-income' | 'reits' | 'crypto';
-  allocation: number;
-  currentValue: number;
-  monthlyReturn: number;
+  target_allocation: number;
   color: string;
+  icon: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Investment {
+  id: string;
+  user_id: string;
+  class_id: string | null;
+  ticker: string;
+  name: string;
+  type: 'stock_br' | 'stock_us' | 'fixed_income' | 'reits' | 'crypto' | 'etf_br' | 'etf_us';
+  quantity: number;
+  average_price: number;
+  current_price: number;
+  currency: 'BRL' | 'USD';
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  investment_class?: InvestmentClass;
 }
 
 export interface RetirementSimulation {
@@ -34,13 +56,6 @@ export interface AssetComparison {
   color: string;
 }
 
-const defaultAssets: InvestmentAsset[] = [
-  { id: '1', name: 'Ações', type: 'stocks', allocation: 45, currentValue: 329400, monthlyReturn: 1.2, color: 'hsl(255 75% 64%)' },
-  { id: '2', name: 'Renda Fixa', type: 'fixed-income', allocation: 35, currentValue: 256200, monthlyReturn: 0.9, color: 'hsl(160 100% 39%)' },
-  { id: '3', name: 'FIIs', type: 'reits', allocation: 15, currentValue: 109800, monthlyReturn: 0.7, color: 'hsl(35 100% 50%)' },
-  { id: '4', name: 'Cripto', type: 'crypto', allocation: 5, currentValue: 36600, monthlyReturn: 2.5, color: 'hsl(200 100% 50%)' },
-];
-
 const assetComparisons: AssetComparison[] = [
   { name: 'CDI', year1: 12.5, year5: 72.3, year10: 175.8, color: 'hsl(160 100% 39%)' },
   { name: 'Ibovespa', year1: 8.2, year5: 48.6, year10: 125.4, color: 'hsl(255 75% 64%)' },
@@ -48,27 +63,257 @@ const assetComparisons: AssetComparison[] = [
   { name: 'Bitcoin', year1: 85.2, year5: 520.3, year10: 1850.5, color: 'hsl(35 100% 50%)' },
 ];
 
+const investmentTypeLabels: Record<Investment['type'], string> = {
+  stock_br: 'Ações BR',
+  stock_us: 'Ações EUA',
+  fixed_income: 'Renda Fixa',
+  reits: 'FIIs',
+  crypto: 'Cripto',
+  etf_br: 'ETF BR',
+  etf_us: 'ETF EUA',
+};
+
 export function useInvestments() {
-  const [assets] = useState<InvestmentAsset[]>(defaultAssets);
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
   const [simulation, setSimulation] = useState<RetirementSimulation>({
     currentAge: 30,
     retirementAge: 65,
-    currentSavings: 732000,
-    monthlyContribution: 5000,
+    currentSavings: 0,
+    monthlyContribution: 1000,
     expectedReturn: 10,
     inflationRate: 4.5,
   });
 
+  // Fetch investment classes
+  const { data: investmentClasses = [], isLoading: loadingClasses } = useQuery({
+    queryKey: ['investment-classes', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const { data, error } = await supabase
+        .from('investment_classes')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('name');
+      
+      if (error) throw error;
+      return data as InvestmentClass[];
+    },
+    enabled: !!user?.id,
+  });
+
+  // Fetch investments
+  const { data: investments = [], isLoading: loadingInvestments } = useQuery({
+    queryKey: ['investments', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const { data, error } = await supabase
+        .from('investments')
+        .select('*, investment_class:investment_classes(*)')
+        .eq('user_id', user.id)
+        .order('name');
+      
+      if (error) throw error;
+      return data as Investment[];
+    },
+    enabled: !!user?.id,
+  });
+
+  // Create investment class
+  const createClassMutation = useMutation({
+    mutationFn: async (data: Omit<InvestmentClass, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
+      if (!user?.id) throw new Error('Usuário não autenticado');
+      const { data: result, error } = await supabase
+        .from('investment_classes')
+        .insert({ ...data, user_id: user.id })
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['investment-classes'] });
+      toast.success('Classe de ativo criada com sucesso!');
+    },
+    onError: (error) => {
+      toast.error('Erro ao criar classe de ativo: ' + error.message);
+    },
+  });
+
+  // Update investment class
+  const updateClassMutation = useMutation({
+    mutationFn: async ({ id, ...data }: Partial<InvestmentClass> & { id: string }) => {
+      const { data: result, error } = await supabase
+        .from('investment_classes')
+        .update(data)
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['investment-classes'] });
+      toast.success('Classe de ativo atualizada!');
+    },
+    onError: (error) => {
+      toast.error('Erro ao atualizar classe de ativo: ' + error.message);
+    },
+  });
+
+  // Delete investment class
+  const deleteClassMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('investment_classes')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['investment-classes'] });
+      queryClient.invalidateQueries({ queryKey: ['investments'] });
+      toast.success('Classe de ativo excluída!');
+    },
+    onError: (error) => {
+      toast.error('Erro ao excluir classe de ativo: ' + error.message);
+    },
+  });
+
+  // Create investment
+  const createInvestmentMutation = useMutation({
+    mutationFn: async (data: Omit<Investment, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'investment_class'>) => {
+      if (!user?.id) throw new Error('Usuário não autenticado');
+      const { data: result, error } = await supabase
+        .from('investments')
+        .insert({ ...data, user_id: user.id })
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['investments'] });
+      toast.success('Ativo adicionado com sucesso!');
+    },
+    onError: (error) => {
+      toast.error('Erro ao adicionar ativo: ' + error.message);
+    },
+  });
+
+  // Update investment
+  const updateInvestmentMutation = useMutation({
+    mutationFn: async ({ id, ...data }: Partial<Investment> & { id: string }) => {
+      const { data: result, error } = await supabase
+        .from('investments')
+        .update(data)
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['investments'] });
+      toast.success('Ativo atualizado!');
+    },
+    onError: (error) => {
+      toast.error('Erro ao atualizar ativo: ' + error.message);
+    },
+  });
+
+  // Delete investment
+  const deleteInvestmentMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('investments')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['investments'] });
+      toast.success('Ativo removido!');
+    },
+    onError: (error) => {
+      toast.error('Erro ao remover ativo: ' + error.message);
+    },
+  });
+
+  // Calculate totals
   const totalValue = useMemo(() => {
-    return assets.reduce((acc, asset) => acc + asset.currentValue, 0);
-  }, [assets]);
+    return investments.reduce((acc, inv) => {
+      const value = inv.quantity * inv.current_price;
+      // Convert USD to BRL (simplified - ideally would use real exchange rate)
+      return acc + (inv.currency === 'USD' ? value * 5.0 : value);
+    }, 0);
+  }, [investments]);
 
+  // Calculate allocation by class
+  const allocationByClass = useMemo(() => {
+    const allocations: Record<string, { name: string; value: number; color: string; target: number }> = {};
+    
+    investmentClasses.forEach(cls => {
+      allocations[cls.id] = {
+        name: cls.name,
+        value: 0,
+        color: cls.color,
+        target: cls.target_allocation,
+      };
+    });
+
+    investments.forEach(inv => {
+      if (inv.class_id && allocations[inv.class_id]) {
+        const value = inv.quantity * inv.current_price;
+        const valueBRL = inv.currency === 'USD' ? value * 5.0 : value;
+        allocations[inv.class_id].value += valueBRL;
+      }
+    });
+
+    return Object.entries(allocations).map(([id, data]) => ({
+      id,
+      ...data,
+      percentage: totalValue > 0 ? (data.value / totalValue) * 100 : 0,
+    }));
+  }, [investments, investmentClasses, totalValue]);
+
+  // Calculate average monthly return (simplified estimation)
   const averageMonthlyReturn = useMemo(() => {
-    return assets.reduce((acc, asset) => acc + (asset.monthlyReturn * asset.allocation / 100), 0);
-  }, [assets]);
+    if (investments.length === 0) return 0;
+    
+    let totalGain = 0;
+    let totalInvested = 0;
 
+    investments.forEach(inv => {
+      const invested = inv.quantity * inv.average_price;
+      const current = inv.quantity * inv.current_price;
+      totalInvested += invested;
+      totalGain += current - invested;
+    });
+
+    if (totalInvested === 0) return 0;
+    
+    // Assume 12-month period for simplicity
+    const totalReturn = (totalGain / totalInvested) * 100;
+    return totalReturn / 12;
+  }, [investments]);
+
+  // Update simulation with current total value
+  const effectiveSimulation = useMemo(() => ({
+    ...simulation,
+    currentSavings: totalValue || simulation.currentSavings,
+  }), [simulation, totalValue]);
+
+  // Projections calculation
   const projections = useMemo((): ProjectionPoint[] => {
-    const { currentAge, retirementAge, currentSavings, monthlyContribution, expectedReturn, inflationRate } = simulation;
+    const { currentAge, retirementAge, currentSavings, monthlyContribution, expectedReturn, inflationRate } = effectiveSimulation;
     const years = retirementAge - currentAge;
     const realReturn = (expectedReturn - inflationRate) / 100;
     const monthlyRealReturn = Math.pow(1 + realReturn, 1/12) - 1;
@@ -86,7 +331,6 @@ export function useInvestments() {
         contributions: Math.round(totalContributions),
       });
       
-      // Compound monthly for the year
       for (let month = 0; month < 12; month++) {
         value = value * (1 + monthlyRealReturn) + monthlyContribution;
         totalContributions += monthlyContribution;
@@ -94,11 +338,10 @@ export function useInvestments() {
     }
 
     return points;
-  }, [simulation]);
+  }, [effectiveSimulation]);
 
   const retirementIncome = useMemo(() => {
     const finalValue = projections[projections.length - 1]?.value || 0;
-    // 4% rule for safe withdrawal rate
     const annualIncome = finalValue * 0.04;
     return Math.round(annualIncome / 12);
   }, [projections]);
@@ -107,14 +350,51 @@ export function useInvestments() {
     setSimulation(prev => ({ ...prev, ...updates }));
   };
 
+  // Legacy assets format for backward compatibility
+  const assets = useMemo(() => {
+    return allocationByClass.map((cls, index) => ({
+      id: cls.id,
+      name: cls.name,
+      type: 'stocks' as const,
+      allocation: cls.percentage,
+      currentValue: cls.value,
+      monthlyReturn: averageMonthlyReturn,
+      color: cls.color,
+    }));
+  }, [allocationByClass, averageMonthlyReturn]);
+
   return {
-    assets,
+    // Investment classes
+    investmentClasses,
+    loadingClasses,
+    createClass: createClassMutation.mutate,
+    updateClass: updateClassMutation.mutate,
+    deleteClass: deleteClassMutation.mutate,
+    
+    // Investments
+    investments,
+    loadingInvestments,
+    createInvestment: createInvestmentMutation.mutate,
+    updateInvestment: updateInvestmentMutation.mutate,
+    deleteInvestment: deleteInvestmentMutation.mutate,
+    
+    // Calculations
     totalValue,
+    allocationByClass,
     averageMonthlyReturn,
-    simulation,
+    
+    // Simulation
+    simulation: effectiveSimulation,
     updateSimulation,
     projections,
     retirementIncome,
+    
+    // Legacy
+    assets,
     assetComparisons,
+    investmentTypeLabels,
+    
+    // Loading states
+    isLoading: loadingClasses || loadingInvestments,
   };
 }

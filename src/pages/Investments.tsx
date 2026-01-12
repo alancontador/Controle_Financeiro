@@ -10,12 +10,15 @@ import { PortfolioOverview } from "@/components/investments/PortfolioOverview";
 import { RetirementSimulator } from "@/components/investments/RetirementSimulator";
 import { ProjectionChart } from "@/components/investments/ProjectionChart";
 import { AssetComparison } from "@/components/investments/AssetComparison";
+import { InvestmentsList } from "@/components/investments/InvestmentsList";
 
 const Investments = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const {
-    assets,
+    investmentClasses,
+    allocationByClass,
+    investments,
     totalValue,
     averageMonthlyReturn,
     simulation,
@@ -23,6 +26,13 @@ const Investments = () => {
     projections,
     retirementIncome,
     assetComparisons,
+    createClass,
+    updateClass,
+    deleteClass,
+    createInvestment,
+    updateInvestment,
+    deleteInvestment,
+    isLoading,
   } = useInvestments();
 
   useEffect(() => {
@@ -31,7 +41,7 @@ const Investments = () => {
     }
   }, [user, authLoading, navigate]);
 
-  if (authLoading) {
+  if (authLoading || isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -61,7 +71,7 @@ const Investments = () => {
             Investimentos
           </h1>
           <p className="text-muted-foreground text-sm mt-1">
-            Acompanhe seu portfólio e planeje sua aposentadoria
+            Gerencie seu portfólio e planeje sua aposentadoria
           </p>
         </motion.div>
 
@@ -80,7 +90,7 @@ const Investments = () => {
               <div>
                 <p className="text-xs text-muted-foreground">Patrimônio</p>
                 <p className="text-lg font-bold text-foreground">
-                  R$ {(totalValue / 1000).toFixed(0)}k
+                  R$ {totalValue > 0 ? (totalValue / 1000).toFixed(0) + 'k' : '0'}
                 </p>
               </div>
             </div>
@@ -99,7 +109,7 @@ const Investments = () => {
               <div>
                 <p className="text-xs text-muted-foreground">Rent. Mensal</p>
                 <p className="text-lg font-bold text-accent">
-                  +{averageMonthlyReturn.toFixed(2)}%
+                  {averageMonthlyReturn >= 0 ? '+' : ''}{averageMonthlyReturn.toFixed(2)}%
                 </p>
               </div>
             </div>
@@ -118,7 +128,7 @@ const Investments = () => {
               <div>
                 <p className="text-xs text-muted-foreground">Meta Aposent.</p>
                 <p className="text-lg font-bold text-foreground">
-                  R$ {(finalValue / 1000000).toFixed(1)}M
+                  R$ {finalValue > 0 ? (finalValue / 1000000).toFixed(1) + 'M' : '0'}
                 </p>
               </div>
             </div>
@@ -144,12 +154,27 @@ const Investments = () => {
           </motion.div>
         </div>
 
+        {/* Investments List - Full Width */}
+        <div className="mb-6">
+          <InvestmentsList
+            investments={investments}
+            investmentClasses={investmentClasses}
+            onCreateInvestment={createInvestment}
+            onUpdateInvestment={updateInvestment}
+            onDeleteInvestment={deleteInvestment}
+          />
+        </div>
+
         {/* Main Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           <PortfolioOverview
-            assets={assets}
+            investmentClasses={investmentClasses}
+            allocationByClass={allocationByClass}
             totalValue={totalValue}
             averageMonthlyReturn={averageMonthlyReturn}
+            onCreateClass={createClass}
+            onUpdateClass={updateClass}
+            onDeleteClass={deleteClass}
           />
           <RetirementSimulator
             simulation={simulation}

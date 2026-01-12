@@ -144,6 +144,95 @@ export type Database = {
         }
         Relationships: []
       }
+      investment_classes: {
+        Row: {
+          color: string
+          created_at: string
+          icon: string | null
+          id: string
+          name: string
+          target_allocation: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          icon?: string | null
+          id?: string
+          name: string
+          target_allocation?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          icon?: string | null
+          id?: string
+          name?: string
+          target_allocation?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      investments: {
+        Row: {
+          average_price: number
+          class_id: string | null
+          created_at: string
+          currency: string
+          current_price: number
+          id: string
+          name: string
+          notes: string | null
+          quantity: number
+          ticker: string
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          average_price?: number
+          class_id?: string | null
+          created_at?: string
+          currency?: string
+          current_price?: number
+          id?: string
+          name: string
+          notes?: string | null
+          quantity?: number
+          ticker: string
+          type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          average_price?: number
+          class_id?: string | null
+          created_at?: string
+          currency?: string
+          current_price?: number
+          id?: string
+          name?: string
+          notes?: string | null
+          quantity?: number
+          ticker?: string
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "investments_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "investment_classes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
