@@ -19,12 +19,15 @@ import {
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Category } from "@/hooks/useCategories";
+import { ChevronRight, FolderTree } from "lucide-react";
 
 interface CategoryModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (data: Omit<Category, "id" | "user_id" | "created_at">) => void;
   category?: Category | null;
+  parentCategories: Category[];
+  allCategories: Category[];
 }
 
 const availableIcons = [
@@ -54,7 +57,7 @@ const availableIcons = [
   "AlertCircle", "HelpCircle", "Info",
   "ArrowLeftRight", "RotateCcw", "RefreshCw",
   "MoreHorizontal", "FolderOpen", "FileBox",
-  "Landmark", "Megaphone",
+  "Landmark", "Megaphone", "FolderTree", "Layers",
 ];
 
 const colorOptions = [
@@ -65,11 +68,19 @@ const colorOptions = [
   "#F43F5E", "#78716C", "#6B7280", "#64748B",
 ];
 
-export function CategoryModal({ isOpen, onClose, onSubmit, category }: CategoryModalProps) {
+export function CategoryModal({ 
+  isOpen, 
+  onClose, 
+  onSubmit, 
+  category, 
+  parentCategories, 
+  allCategories 
+}: CategoryModalProps) {
   const [name, setName] = useState("");
   const [type, setType] = useState<"income" | "expense">("expense");
   const [icon, setIcon] = useState("Tag");
   const [color, setColor] = useState("#6366F1");
+  const [parentCategoryId, setParentCategoryId] = useState<string | null>(null);
   const [iconSearch, setIconSearch] = useState("");
 
   useEffect(() => {
@@ -78,14 +89,35 @@ export function CategoryModal({ isOpen, onClose, onSubmit, category }: CategoryM
       setType(category.type);
       setIcon(category.icon);
       setColor(category.color);
+      setParentCategoryId(category.parent_category_id);
     } else {
       setName("");
       setType("expense");
       setIcon("Tag");
       setColor("#6366F1");
+      setParentCategoryId(null);
     }
     setIconSearch("");
   }, [category, isOpen]);
+
+  // Filter parent categories based on type and exclude self and children
+  const getAvailableParents = () => {
+    return allCategories.filter((c) => {
+      // Must match type
+      if (c.type !== type) return false;
+      // Cannot be itself
+      if (category && c.id === category.id) return false;
+      // Cannot be a child of the current category (if editing)
+      if (category) {
+        let current: Category | undefined = c;
+        while (current?.parent_category_id) {
+          if (current.parent_category_id === category.id) return false;
+          current = allCategories.find((cat) => cat.id === current?.parent_category_id);
+        }
+      }
+      return true;
+    });
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -96,6 +128,7 @@ export function CategoryModal({ isOpen, onClose, onSubmit, category }: CategoryM
       type,
       icon,
       color,
+      parent_category_id: parentCategoryId,
     });
     onClose();
   };
@@ -105,6 +138,14 @@ export function CategoryModal({ isOpen, onClose, onSubmit, category }: CategoryM
   );
 
   const IconComponent = (LucideIcons as any)[icon] || LucideIcons.Tag;
+  const availableParents = getAvailableParents();
+
+  // Get parent name for display
+  const getParentName = () => {
+    if (!parentCategoryId) return null;
+    const parent = allCategories.find((c) => c.id === parentCategoryId);
+    return parent?.name;
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -130,9 +171,17 @@ export function CategoryModal({ isOpen, onClose, onSubmit, category }: CategoryM
                 <IconComponent className="w-6 h-6" style={{ color }} />
               </div>
               <div>
-                <p className="font-semibold text-foreground">
-                  {name || "Nome da categoria"}
-                </p>
+                <div className="flex items-center gap-1">
+                  {getParentName() && (
+                    <>
+                      <span className="text-xs text-muted-foreground">{getParentName()}</span>
+                      <ChevronRight className="w-3 h-3 text-muted-foreground" />
+                    </>
+                  )}
+                  <p className="font-semibold text-foreground">
+                    {name || "Nome da categoria"}
+                  </p>
+                </div>
                 <p className="text-sm text-muted-foreground">
                   {type === "income" ? "Receita" : "Despesa"}
                 </p>
@@ -156,7 +205,14 @@ export function CategoryModal({ isOpen, onClose, onSubmit, category }: CategoryM
           {/* Type */}
           <div className="space-y-2">
             <Label>Tipo</Label>
-            <Select value={type} onValueChange={(v) => setType(v as "income" | "expense")}>
+            <Select 
+              value={type} 
+              onValueChange={(v) => {
+                setType(v as "income" | "expense");
+                // Reset parent if type changes
+                setParentCategoryId(null);
+              }}
+            >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -175,6 +231,41 @@ export function CategoryModal({ isOpen, onClose, onSubmit, category }: CategoryM
                 </SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          {/* Parent Category */}
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2">
+              <FolderTree className="w-4 h-4" />
+              Categoria Pai (Opcional)
+            </Label>
+            <Select 
+              value={parentCategoryId || "none"} 
+              onValueChange={(v) => setParentCategoryId(v === "none" ? null : v)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione uma categoria pai" />
+              </SelectTrigger>
+              <SelectContent className="bg-popover border-border max-h-60">
+                <SelectItem value="none">
+                  <span className="text-muted-foreground">Nenhuma (categoria principal)</span>
+                </SelectItem>
+                {availableParents.map((parent) => {
+                  const ParentIcon = (LucideIcons as any)[parent.icon] || LucideIcons.Tag;
+                  return (
+                    <SelectItem key={parent.id} value={parent.id}>
+                      <span className="flex items-center gap-2">
+                        <ParentIcon className="w-4 h-4" style={{ color: parent.color }} />
+                        {parent.name}
+                      </span>
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Selecione uma categoria pai para criar uma subcategoria. Ex: Transporte &gt; Uber
+            </p>
           </div>
 
           {/* Color */}

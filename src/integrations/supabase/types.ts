@@ -59,6 +59,7 @@ export type Database = {
           icon: string | null
           id: string
           name: string
+          parent_category_id: string | null
           type: string
           user_id: string
         }
@@ -68,6 +69,7 @@ export type Database = {
           icon?: string | null
           id?: string
           name: string
+          parent_category_id?: string | null
           type: string
           user_id: string
         }
@@ -77,10 +79,19 @@ export type Database = {
           icon?: string | null
           id?: string
           name?: string
+          parent_category_id?: string | null
           type?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "categories_parent_category_id_fkey"
+            columns: ["parent_category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       goals: {
         Row: {

@@ -10,12 +10,13 @@ import {
   TrendingDown,
   RefreshCw,
   AlertCircle,
+  FolderTree,
 } from "lucide-react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { MobileNav } from "@/components/layout/MobileNav";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,7 +28,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useAuth } from "@/hooks/useAuth";
-import { useCategories, Category } from "@/hooks/useCategories";
+import { useCategories, Category, CategoryWithChildren } from "@/hooks/useCategories";
 import { CategoryCard } from "@/components/categories/CategoryCard";
 import { CategoryModal } from "@/components/categories/CategoryModal";
 
@@ -36,6 +37,7 @@ const Categories = () => {
   const navigate = useNavigate();
   const {
     categories,
+    categoriesTree,
     loading,
     addCategory,
     updateCategory,
@@ -56,26 +58,33 @@ const Categories = () => {
     }
   }, [user, authLoading, navigate]);
 
-  const filteredCategories = useMemo(() => {
-    let filtered = categories;
+  // Filter tree based on search and type
+  const filteredTree = useMemo(() => {
+    const filterNode = (node: CategoryWithChildren): CategoryWithChildren | null => {
+      const matchesSearch = !search || node.name.toLowerCase().includes(search.toLowerCase());
+      const matchesType = activeTab === "all" || node.type === activeTab;
 
-    if (search) {
-      filtered = filtered.filter((cat) =>
-        cat.name.toLowerCase().includes(search.toLowerCase())
-      );
-    }
+      // Filter children recursively
+      const filteredChildren = node.children
+        .map(filterNode)
+        .filter((n): n is CategoryWithChildren => n !== null);
 
-    if (activeTab === "income") {
-      filtered = filtered.filter((cat) => cat.type === "income");
-    } else if (activeTab === "expense") {
-      filtered = filtered.filter((cat) => cat.type === "expense");
-    }
+      // Include node if it matches or has matching children
+      if ((matchesSearch && matchesType) || filteredChildren.length > 0) {
+        return { ...node, children: filteredChildren };
+      }
 
-    return filtered;
-  }, [categories, search, activeTab]);
+      return null;
+    };
+
+    return categoriesTree
+      .map(filterNode)
+      .filter((n): n is CategoryWithChildren => n !== null);
+  }, [categoriesTree, search, activeTab]);
 
   const incomeCount = categories.filter((c) => c.type === "income").length;
   const expenseCount = categories.filter((c) => c.type === "expense").length;
+  const subcategoryCount = categories.filter((c) => c.parent_category_id).length;
 
   if (authLoading || loading) {
     return (
@@ -133,7 +142,7 @@ const Categories = () => {
               Categorias
             </h1>
             <p className="text-muted-foreground text-sm mt-1">
-              Gerencie suas categorias de receitas e despesas
+              Gerencie suas categorias e subcategorias de receitas e despesas
             </p>
           </div>
 
@@ -169,7 +178,7 @@ const Categories = () => {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6"
+          className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6"
         >
           <div className="glass-card rounded-xl p-4 flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
@@ -177,7 +186,7 @@ const Categories = () => {
             </div>
             <div>
               <p className="text-2xl font-bold text-foreground">{categories.length}</p>
-              <p className="text-sm text-muted-foreground">Total de Categorias</p>
+              <p className="text-sm text-muted-foreground">Total</p>
             </div>
           </div>
 
@@ -198,6 +207,16 @@ const Categories = () => {
             <div>
               <p className="text-2xl font-bold text-foreground">{expenseCount}</p>
               <p className="text-sm text-muted-foreground">Despesas</p>
+            </div>
+          </div>
+
+          <div className="glass-card rounded-xl p-4 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center">
+              <FolderTree className="w-5 h-5 text-muted-foreground" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-foreground">{subcategoryCount}</p>
+              <p className="text-sm text-muted-foreground">Subcategorias</p>
             </div>
           </div>
         </motion.div>
@@ -230,13 +249,13 @@ const Categories = () => {
           </div>
         </motion.div>
 
-        {/* Categories Grid */}
+        {/* Categories Tree */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
         >
-          {filteredCategories.length === 0 ? (
+          {filteredTree.length === 0 ? (
             <div className="text-center py-12">
               <Tag className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-medium text-foreground mb-2">
@@ -259,8 +278,8 @@ const Categories = () => {
               </Button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {filteredCategories.map((category, index) => (
+            <div className="space-y-2">
+              {filteredTree.map((category, index) => (
                 <CategoryCard
                   key={category.id}
                   category={category}
@@ -283,6 +302,8 @@ const Categories = () => {
         }}
         onSubmit={handleSubmit}
         category={editingCategory}
+        parentCategories={categories.filter((c) => !c.parent_category_id)}
+        allCategories={categories}
       />
 
       {/* Delete Confirmation */}
@@ -295,7 +316,7 @@ const Categories = () => {
             </AlertDialogTitle>
             <AlertDialogDescription>
               Tem certeza que deseja excluir esta categoria? Esta ação não pode
-              ser desfeita. Categorias em uso não podem ser excluídas.
+              ser desfeita. Categorias em uso ou com subcategorias não podem ser excluídas.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
