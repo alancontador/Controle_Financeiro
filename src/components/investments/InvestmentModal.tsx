@@ -41,7 +41,7 @@ export function InvestmentModal({ isOpen, onClose, onSave, investment, investmen
       setTicker(investment.ticker);
       setName(investment.name);
       setType(investment.type);
-      setClassId(investment.class_id || '');
+      setClassId(investment.class_id || 'none');
       setQuantity(investment.quantity.toString());
       setAveragePrice(investment.average_price.toString());
       setCurrentPrice(investment.current_price.toString());
@@ -51,7 +51,7 @@ export function InvestmentModal({ isOpen, onClose, onSave, investment, investmen
       setTicker('');
       setName('');
       setType('stock_br');
-      setClassId('');
+      setClassId('none');
       setQuantity('0');
       setAveragePrice('0');
       setCurrentPrice('0');
@@ -75,7 +75,7 @@ export function InvestmentModal({ isOpen, onClose, onSave, investment, investmen
       ticker: ticker.toUpperCase(),
       name,
       type,
-      class_id: classId || null,
+      class_id: classId === 'none' ? null : classId,
       quantity: parseFloat(quantity) || 0,
       average_price: parseFloat(averagePrice) || 0,
       current_price: parseFloat(currentPrice) || 0,
@@ -146,7 +146,7 @@ export function InvestmentModal({ isOpen, onClose, onSave, investment, investmen
                 <SelectValue placeholder="Selecione uma classe (opcional)" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Nenhuma</SelectItem>
+                <SelectItem value="none">Nenhuma</SelectItem>
                 {investmentClasses.map((cls) => (
                   <SelectItem key={cls.id} value={cls.id}>
                     <div className="flex items-center gap-2">
