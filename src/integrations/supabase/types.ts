@@ -52,6 +52,38 @@ export type Database = {
           },
         ]
       }
+      card_holders: {
+        Row: {
+          card_id: string
+          created_at: string
+          holder_name: string
+          id: string
+          is_primary: boolean
+        }
+        Insert: {
+          card_id: string
+          created_at?: string
+          holder_name: string
+          id?: string
+          is_primary?: boolean
+        }
+        Update: {
+          card_id?: string
+          created_at?: string
+          holder_name?: string
+          id?: string
+          is_primary?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_holders_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "credit_cards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       categories: {
         Row: {
           color: string | null
@@ -92,6 +124,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      credit_cards: {
+        Row: {
+          brand: string
+          closing_day: number
+          created_at: string
+          due_day: number
+          id: string
+          issuer_bank: string
+          last_four_digits: string
+          nickname: string
+          total_limit: number
+          user_id: string
+        }
+        Insert: {
+          brand: string
+          closing_day: number
+          created_at?: string
+          due_day: number
+          id?: string
+          issuer_bank: string
+          last_four_digits: string
+          nickname: string
+          total_limit?: number
+          user_id: string
+        }
+        Update: {
+          brand?: string
+          closing_day?: number
+          created_at?: string
+          due_day?: number
+          id?: string
+          issuer_bank?: string
+          last_four_digits?: string
+          nickname?: string
+          total_limit?: number
+          user_id?: string
+        }
+        Relationships: []
       }
       dividends: {
         Row: {
@@ -273,6 +344,97 @@ export type Database = {
             columns: ["class_id"]
             isOneToOne: false
             referencedRelation: "investment_classes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoice_items: {
+        Row: {
+          amount: number
+          category: string
+          created_at: string
+          description: string
+          holder_name: string
+          id: string
+          installment_current: number | null
+          installment_total: number | null
+          invoice_id: string
+          is_previous_balance: boolean
+          transaction_date: string
+        }
+        Insert: {
+          amount: number
+          category?: string
+          created_at?: string
+          description: string
+          holder_name: string
+          id?: string
+          installment_current?: number | null
+          installment_total?: number | null
+          invoice_id: string
+          is_previous_balance?: boolean
+          transaction_date: string
+        }
+        Update: {
+          amount?: number
+          category?: string
+          created_at?: string
+          description?: string
+          holder_name?: string
+          id?: string
+          installment_current?: number | null
+          installment_total?: number | null
+          invoice_id?: string
+          is_previous_balance?: boolean
+          transaction_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_items_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoices: {
+        Row: {
+          card_id: string
+          created_at: string
+          id: string
+          period_end: string
+          period_start: string
+          previous_balance: number
+          status: string
+          total_amount: number
+        }
+        Insert: {
+          card_id: string
+          created_at?: string
+          id?: string
+          period_end: string
+          period_start: string
+          previous_balance?: number
+          status?: string
+          total_amount?: number
+        }
+        Update: {
+          card_id?: string
+          created_at?: string
+          id?: string
+          period_end?: string
+          period_start?: string
+          previous_balance?: number
+          status?: string
+          total_amount?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "credit_cards"
             referencedColumns: ["id"]
           },
         ]
