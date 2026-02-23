@@ -39,77 +39,188 @@ function autoCategory(desc: string): string {
   return 'Outros';
 }
 
-function parseBradescoPdf(text: string): { items: ParsedItem[]; previousBalance: number; error?: string } {
-  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+function parseBradescoPdf(text: string): { items: ParsedItem[]; previousBalance: number; totalFatura?: number; error?: string } {
+  const lines = text.split('\n').map(l => l.replace(/\s+/g, ' ').trim()).filter(Boolean);
   const items: ParsedItem[] = [];
   let previousBalance = 0;
+  let totalFatura: number | undefined;
   let currentHolder = '';
 
-  // Pattern for holder: NAME followed by card number XXXX.XXXX.XXXX.NNNN
-  const holderPattern = /^(.+?)\s+\d{4}\.\d{4}\.\d{4}\.\d{4}/;
-  // Pattern for transaction: DD/MM DESCRIPTION VALUE
-  const txPattern = /^(\d{2}\/\d{2})\s+(.+?)\s+([\d.,]+)$/;
-  // Saldo anterior
-  const saldoPattern = /saldo\s+anterior/i;
-  
-  for (const line of lines) {
+  // Lines to ignore
+  const ignorePatterns = [
+    /^Data\s+Hist[oó]rico/i,
+    /Moeda\s+de\s+origem/i,
+    /^US\$/i,
+    /Cota[çc][aã]o/i,
+    /^Total\s+para\s+/i,
+    /\d{4}\.\d{4}\.\d{4}\.\d{4}/,
+    /Extrato\s+em\s+Aberto/i,
+  ];
+
+  const shouldIgnore = (line: string) => ignorePatterns.some(p => p.test(line));
+
+  // Detect holder: line containing "- ELO" or similar card brand suffix
+  const holderPattern = /^(.+?)\s*-\s*(ELO|VISA|MASTERCARD|MASTER|AMEX|HIPERCARD)/i;
+
+  // Date pattern at start of line
+  const datePattern = /^(\d{2}\/\d{2})\s*(.*)/;
+
+  // Value pattern (monetary)
+  const valuePattern = /^-?\d{1,3}(\.\d{3})*,\d{2}$/;
+  const valueExtract = /(-?\d{1,3}(?:\.\d{3})*,\d{2})\s*$/;
+
+  // Total da fatura
+  const totalFaturaPattern = /Total\s+da\s+Fatura\s+em\s+Real/i;
+
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+
+    // Check total da fatura
+    if (totalFaturaPattern.test(line)) {
+      const valMatch = line.match(valueExtract);
+      if (valMatch) {
+        totalFatura = parseFloat(valMatch[1].replace(/\./g, '').replace(',', '.'));
+      } else if (i + 1 < lines.length) {
+        const nextVal = lines[i + 1].trim();
+        if (valuePattern.test(nextVal)) {
+          totalFatura = parseFloat(nextVal.replace(/\./g, '').replace(',', '.'));
+          i++;
+        }
+      }
+      i++;
+      continue;
+    }
+
+    // Ignore lines
+    if (shouldIgnore(line)) { i++; continue; }
+
+    // Detect holder
     const holderMatch = line.match(holderPattern);
     if (holderMatch) {
       currentHolder = holderMatch[1].trim();
+      i++;
       continue;
     }
 
-    if (saldoPattern.test(line)) {
-      const valMatch = line.match(/([\d.,]+)\s*$/);
+    // Detect saldo anterior
+    if (/saldo\s+anterior/i.test(line)) {
+      const valMatch = line.match(valueExtract);
       if (valMatch) {
         previousBalance = parseFloat(valMatch[1].replace(/\./g, '').replace(',', '.')) || 0;
+      } else if (i + 1 < lines.length) {
+        const nextVal = lines[i + 1].trim();
+        if (valuePattern.test(nextVal)) {
+          previousBalance = parseFloat(nextVal.replace(/\./g, '').replace(',', '.')) || 0;
+          i++;
+        }
       }
+      i++;
       continue;
     }
 
-    const txMatch = line.match(txPattern);
-    if (txMatch && currentHolder) {
-      const dateStr = txMatch[1]; // DD/MM
-      let desc = txMatch[2].trim();
-      const amountStr = txMatch[3];
-      const amount = parseFloat(amountStr.replace(/\./g, '').replace(',', '.')) || 0;
+    // Detect transaction starting with date
+    const dateMatch = line.match(datePattern);
+    if (dateMatch && currentHolder) {
+      const dateStr = dateMatch[1];
+      let descParts: string[] = [];
+      const restOfLine = dateMatch[2]?.trim() || '';
 
-      // Parse installment from description (e.g., "COMPRA 2/3")
-      let instCurrent: number | null = null;
-      let instTotal: number | null = null;
-      const instMatch = desc.match(/(\d+)\/(\d+)/);
-      if (instMatch) {
-        const a = parseInt(instMatch[1]);
-        const b = parseInt(instMatch[2]);
-        // Only treat as installment if reasonable values
-        if (a <= b && b <= 99) {
-          instCurrent = a;
-          instTotal = b;
-        }
+      // Check if rest of line ends with a value
+      const inlineVal = restOfLine.match(valueExtract);
+      if (inlineVal) {
+        // Value is on the same line
+        const desc = restOfLine.replace(valueExtract, '').trim();
+        if (desc) descParts.push(desc);
+        const amount = parseFloat(inlineVal[1].replace(/\./g, '').replace(',', '.')) || 0;
+        pushItem(items, currentHolder, dateStr, descParts.join(' '), amount);
+        i++;
+        continue;
       }
 
-      // Use current year for date
-      const year = new Date().getFullYear();
-      const [dd, mm] = dateStr.split('/');
-      const isoDate = `${year}-${mm}-${dd}`;
+      // Value not on same line — accumulate description lines
+      if (restOfLine) descParts.push(restOfLine);
+      let j = i + 1;
+      let foundValue = false;
+      while (j < lines.length) {
+        const nextLine = lines[j];
+        // If next line is a new date, holder, or ignored, stop
+        if (datePattern.test(nextLine) || holderPattern.test(nextLine) || totalFaturaPattern.test(nextLine)) break;
+        if (shouldIgnore(nextLine)) { j++; continue; }
 
-      items.push({
-        holder_name: currentHolder,
-        transaction_date: isoDate,
-        description: desc,
-        amount,
-        category: autoCategory(desc),
-        installment_current: instCurrent,
-        installment_total: instTotal,
-      });
+        const valM = nextLine.match(valueExtract);
+        if (valM) {
+          // Check if there's description before the value on this line
+          const beforeVal = nextLine.replace(valueExtract, '').trim();
+          if (beforeVal && !/saldo\s+anterior/i.test(beforeVal)) descParts.push(beforeVal);
+          const amount = parseFloat(valM[1].replace(/\./g, '').replace(',', '.')) || 0;
+          pushItem(items, currentHolder, dateStr, descParts.join(' '), amount);
+          foundValue = true;
+          j++;
+          break;
+        }
+
+        // Pure value line
+        if (valuePattern.test(nextLine.trim())) {
+          const amount = parseFloat(nextLine.trim().replace(/\./g, '').replace(',', '.')) || 0;
+          pushItem(items, currentHolder, dateStr, descParts.join(' '), amount);
+          foundValue = true;
+          j++;
+          break;
+        }
+
+        // Otherwise it's part of the description
+        descParts.push(nextLine);
+        j++;
+      }
+
+      if (!foundValue && descParts.length > 0) {
+        // No value found — skip this entry
+      }
+      i = j;
+      continue;
     }
+
+    i++;
   }
 
   if (items.length === 0) {
+    console.warn('[ImportPdfModal] Nenhum lançamento identificado. Primeiras 50 linhas do texto extraído:');
+    lines.slice(0, 50).forEach((l, idx) => console.log(`  ${idx + 1}: ${l}`));
     return { items: [], previousBalance: 0, error: 'Não foi possível identificar lançamentos no PDF. Verifique se o formato é compatível com extratos do Bradesco.' };
   }
 
-  return { items, previousBalance };
+  return { items, previousBalance, totalFatura };
+}
+
+function pushItem(items: ParsedItem[], holder: string, dateStr: string, desc: string, amount: number) {
+  let instCurrent: number | null = null;
+  let instTotal: number | null = null;
+  const instMatch = desc.match(/(\d+)\/(\d+)/);
+  if (instMatch) {
+    const a = parseInt(instMatch[1]);
+    const b = parseInt(instMatch[2]);
+    if (a <= b && b <= 99 && a >= 1) {
+      instCurrent = a;
+      instTotal = b;
+    }
+  }
+
+  const year = new Date().getFullYear();
+  const [dd, mm] = dateStr.split('/');
+  const isoDate = `${year}-${mm}-${dd}`;
+
+  const isPrevBalance = /saldo\s+anterior/i.test(desc);
+
+  items.push({
+    holder_name: holder,
+    transaction_date: isoDate,
+    description: desc.trim(),
+    amount,
+    category: isPrevBalance ? 'Outros' : autoCategory(desc),
+    installment_current: instCurrent,
+    installment_total: instTotal,
+  });
 }
 
 export function ImportPdfModal({ open, onClose, onConfirm }: Props) {
