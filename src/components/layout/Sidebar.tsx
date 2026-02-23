@@ -12,6 +12,7 @@ import {
   Settings,
   LogOut,
   Tag,
+  CreditCard,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -28,6 +29,7 @@ const navItems: NavItem[] = [
   { icon: CalendarDays, label: "Calendário", href: "/calendar" },
   { icon: Wallet, label: "Orçamentos", href: "/budgets" },
   { icon: Tag, label: "Categorias", href: "/categories" },
+  { icon: CreditCard, label: "Cartões", href: "/cartoes" },
   { icon: TrendingUp, label: "Investimentos", href: "/investments" },
   { icon: Target, label: "Metas", href: "/goals" },
   { icon: FileText, label: "Relatórios", href: "/reports" },
