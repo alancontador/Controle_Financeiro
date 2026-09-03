@@ -1,9 +1,84 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import Anthropic from "npm:@anthropic-ai/sdk@0.123.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+// Formato da resposta da IA. O front (useInsights / componentes de Insights)
+// depende desta forma exata, entao mudar aqui exige mudar la tambem.
+const INSIGHTS_SCHEMA = {
+  type: "object",
+  properties: {
+    summary: {
+      type: "object",
+      properties: {
+        health_score: { type: "number", description: "Pontuacao de saude financeira de 0 a 100" },
+        health_status: { type: "string", enum: ["excellent", "good", "attention", "critical"] },
+        main_message: { type: "string", description: "Mensagem principal de ate 2 frases" },
+      },
+      required: ["health_score", "health_status", "main_message"],
+      additionalProperties: false,
+    },
+    patterns: {
+      type: "array",
+      description: "Padroes identificados nos gastos (3 a 5 itens)",
+      items: {
+        type: "object",
+        properties: {
+          title: { type: "string" },
+          description: { type: "string" },
+          type: { type: "string", enum: ["positive", "negative", "neutral"] },
+          category: { type: "string" },
+        },
+        required: ["title", "description", "type", "category"],
+        additionalProperties: false,
+      },
+    },
+    savings_tips: {
+      type: "array",
+      description: "Sugestoes de economia ordenadas por impacto (3 a 5 itens)",
+      items: {
+        type: "object",
+        properties: {
+          title: { type: "string" },
+          description: { type: "string" },
+          potential_savings: { type: "number", description: "Economia potencial em reais" },
+          difficulty: { type: "string", enum: ["easy", "medium", "hard"] },
+          category: { type: "string" },
+        },
+        required: ["title", "description", "potential_savings", "difficulty", "category"],
+        additionalProperties: false,
+      },
+    },
+    monthly_trend: {
+      type: "object",
+      properties: {
+        trend: { type: "string", enum: ["improving", "stable", "declining"] },
+        description: { type: "string" },
+      },
+      required: ["trend", "description"],
+      additionalProperties: false,
+    },
+    action_items: {
+      type: "array",
+      description: "Proximas acoes recomendadas (2 a 4 itens)",
+      items: {
+        type: "object",
+        properties: {
+          action: { type: "string" },
+          priority: { type: "string", enum: ["high", "medium", "low"] },
+          timeframe: { type: "string" },
+        },
+        required: ["action", "priority", "timeframe"],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ["summary", "patterns", "savings_tips", "monthly_trend", "action_items"],
+  additionalProperties: false,
 };
 
 serve(async (req) => {
@@ -111,146 +186,73 @@ ORÇAMENTOS DEFINIDOS:
 ${budgets?.length ? budgets.map((b: any) => `- ${b.category?.name || "Categoria"}: R$ ${b.amount} (${b.period})`).join("\n") : "Nenhum orçamento definido"}
 `;
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
+    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+    if (!ANTHROPIC_API_KEY) {
+      throw new Error("ANTHROPIC_API_KEY nao esta configurada");
     }
 
-    console.log("Calling AI gateway for financial analysis...");
+    console.log("Chamando a API da Anthropic para a analise financeira...");
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          {
-            role: "system",
-            content: `Você é um consultor financeiro pessoal especializado em análise de gastos e economia. Seu papel é analisar os dados financeiros do usuário e fornecer insights acionáveis.
+    const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
 
-Responda SEMPRE em português brasileiro usando formato JSON estruturado através da função fornecida.
+    let message;
+    try {
+      message = await anthropic.messages.create({
+        model: "claude-opus-5",
+        max_tokens: 16000,
+        system: `Voce e um consultor financeiro pessoal especializado em analise de gastos e economia. Seu papel e analisar os dados financeiros do usuario e fornecer insights acionaveis.
+
+Responda SEMPRE em portugues brasileiro.
 
 Diretrizes:
-1. Seja específico e prático nas sugestões
-2. Use os dados reais para fazer comparações e identificar padrões
-3. Priorize sugestões por impacto financeiro
+1. Seja especifico e pratico nas sugestoes
+2. Use os dados reais para fazer comparacoes e identificar padroes
+3. Priorize sugestoes por impacto financeiro
 4. Seja encorajador mas realista
-5. Identifique tanto pontos positivos quanto áreas de melhoria`,
-          },
+5. Identifique tanto pontos positivos quanto areas de melhoria`,
+        messages: [
           {
             role: "user",
-            content: `Analise os dados financeiros abaixo e forneça insights detalhados:\n\n${financialContext}`,
+            content: `Analise os dados financeiros abaixo e forneca insights detalhados:\n\n${financialContext}`,
           },
         ],
-        tools: [
-          {
-            type: "function",
-            function: {
-              name: "provide_financial_insights",
-              description: "Fornecer análise financeira estruturada com insights e sugestões",
-              parameters: {
-                type: "object",
-                properties: {
-                  summary: {
-                    type: "object",
-                    properties: {
-                      health_score: { type: "number", description: "Pontuação de saúde financeira de 0 a 100" },
-                      health_status: { type: "string", enum: ["excellent", "good", "attention", "critical"], description: "Status geral" },
-                      main_message: { type: "string", description: "Mensagem principal de até 2 frases" },
-                    },
-                    required: ["health_score", "health_status", "main_message"],
-                  },
-                  patterns: {
-                    type: "array",
-                    items: {
-                      type: "object",
-                      properties: {
-                        title: { type: "string" },
-                        description: { type: "string" },
-                        type: { type: "string", enum: ["positive", "negative", "neutral"] },
-                        category: { type: "string" },
-                      },
-                      required: ["title", "description", "type"],
-                    },
-                    description: "Padrões identificados nos gastos (3-5 itens)",
-                  },
-                  savings_tips: {
-                    type: "array",
-                    items: {
-                      type: "object",
-                      properties: {
-                        title: { type: "string" },
-                        description: { type: "string" },
-                        potential_savings: { type: "number", description: "Economia potencial em reais" },
-                        difficulty: { type: "string", enum: ["easy", "medium", "hard"] },
-                        category: { type: "string" },
-                      },
-                      required: ["title", "description", "potential_savings", "difficulty"],
-                    },
-                    description: "Sugestões de economia ordenadas por impacto (3-5 itens)",
-                  },
-                  monthly_trend: {
-                    type: "object",
-                    properties: {
-                      trend: { type: "string", enum: ["improving", "stable", "declining"] },
-                      description: { type: "string" },
-                    },
-                    required: ["trend", "description"],
-                  },
-                  action_items: {
-                    type: "array",
-                    items: {
-                      type: "object",
-                      properties: {
-                        action: { type: "string" },
-                        priority: { type: "string", enum: ["high", "medium", "low"] },
-                        timeframe: { type: "string" },
-                      },
-                      required: ["action", "priority", "timeframe"],
-                    },
-                    description: "Próximas ações recomendadas (2-4 itens)",
-                  },
-                },
-                required: ["summary", "patterns", "savings_tips", "monthly_trend", "action_items"],
-              },
-            },
-          },
-        ],
-        tool_choice: { type: "function", function: { name: "provide_financial_insights" } },
-      }),
-    });
-
-    if (!response.ok) {
-      if (response.status === 429) {
+        output_config: {
+          format: { type: "json_schema", schema: INSIGHTS_SCHEMA },
+        },
+      });
+    } catch (err) {
+      // Erros da API viram status HTTP proprios para a UI diferenciar
+      // "tente de novo" de "arrume a configuracao".
+      if (err instanceof Anthropic.RateLimitError) {
         return new Response(
-          JSON.stringify({ error: "Limite de requisições atingido. Tente novamente em alguns minutos." }),
+          JSON.stringify({ error: "Limite de requisicoes atingido. Tente novamente em alguns minutos." }),
           { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      if (response.status === 402) {
+      if (err instanceof Anthropic.AuthenticationError) {
         return new Response(
-          JSON.stringify({ error: "Créditos insuficientes. Adicione créditos para continuar." }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          JSON.stringify({ error: "Chave da API invalida. Verifique a configuracao do servico." }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      const errorText = await response.text();
-      console.error("AI gateway error:", response.status, errorText);
-      throw new Error("Failed to get AI analysis");
+      if (err instanceof Anthropic.APIError) {
+        console.error("Erro da API Anthropic:", err.status, err.message);
+        throw new Error("Falha ao obter a analise da IA");
+      }
+      throw err;
     }
 
-    const aiResponse = await response.json();
-    console.log("AI response received:", JSON.stringify(aiResponse).substring(0, 500));
-
-    // Extract the function call result
-    const toolCall = aiResponse.choices?.[0]?.message?.tool_calls?.[0];
-    if (!toolCall || toolCall.function.name !== "provide_financial_insights") {
-      throw new Error("Invalid AI response format");
+    if (message.stop_reason === "refusal") {
+      console.error("Requisicao recusada:", message.stop_details);
+      throw new Error("Nao foi possivel gerar a analise para estes dados");
     }
 
-    const insights = JSON.parse(toolCall.function.arguments);
+    const textBlock = message.content.find((block) => block.type === "text");
+    if (!textBlock || textBlock.type !== "text") {
+      throw new Error("Resposta da IA em formato inesperado");
+    }
+
+    const insights = JSON.parse(textBlock.text);
 
     return new Response(JSON.stringify({ insights, rawData: { totalIncome, totalExpenses, expensesByCategory } }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
