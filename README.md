@@ -1,73 +1,56 @@
-# Welcome to your Lovable project
+# Controle Financeiro
 
-## Project info
+Aplicacao web de controle financeiro pessoal: transacoes, categorias, orcamentos,
+metas, cartoes, investimentos, relatorios e insights.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## Stack
 
-## How can I edit this code?
+React 18 + TypeScript + Vite + Tailwind CSS + shadcn-ui + Supabase (Postgres, Auth,
+Edge Functions) + TanStack Query + Recharts.
 
-There are several ways of editing your application.
+## Rodando localmente
 
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+Requer Node.js 20+.
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+npm install
+cp .env.example .env   # preencha com as credenciais do seu projeto Supabase
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+O app sobe em `http://localhost:8080`.
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## Variaveis de ambiente
 
-**Use GitHub Codespaces**
+| Variavel | Descricao |
+|---|---|
+| `VITE_SUPABASE_URL` | URL do projeto Supabase |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | Chave publica (anon) do Supabase |
+| `VITE_SUPABASE_PROJECT_ID` | ID do projeto Supabase |
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+Em desenvolvimento elas vem do `.env` (via Vite). Em producao o container gera
+`env-config.js` em runtime a partir das variaveis do ambiente, e o app le de
+`window.__env` — necessario porque o build do Vite e estatico e o EasyPanel nao
+passa variaveis como build args.
 
-## What technologies are used for this project?
+## Deploy
 
-This project is built with:
+Build multi-stage (Node 20 -> Nginx) via `Dockerfile`, publicado no EasyPanel.
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+```sh
+docker build -t controle-financeiro .
+docker run -p 8080:80 \
+  -e VITE_SUPABASE_URL=... \
+  -e VITE_SUPABASE_PUBLISHABLE_KEY=... \
+  controle-financeiro
+```
 
-## How can I deploy this project?
+## Edge Functions (Supabase)
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+| Funcao | O que faz |
+|---|---|
+| `analyze-finances` | Gera insights financeiros com IA a partir das transacoes e orcamentos |
+| `fetch-quotes` | Busca cotacoes para o modulo de investimentos |
+| `process-recurring-transactions` | Materializa transacoes recorrentes |
 
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+Deploy: `supabase functions deploy <nome>`.

@@ -1,0 +1,4 @@
+# Scripts de shell precisam de LF: CRLF quebra o shebang dentro do container Alpine
+*.sh text eol=lf
+Dockerfile text eol=lf
+nginx.conf text eol=lf
