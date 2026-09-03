@@ -54,3 +54,21 @@ docker run -p 8080:80 \
 | `process-recurring-transactions` | Materializa transacoes recorrentes |
 
 Deploy: `supabase functions deploy <nome>`.
+
+### Secrets das funcoes
+
+`analyze-finances` usa a API do Gemini (Google AI Studio, camada gratuita):
+
+| Secret | Obrigatorio | Descricao |
+|---|---|---|
+| `GEMINI_API_KEY` | sim | Chave criada em https://aistudio.google.com/apikey |
+| `GEMINI_MODEL` | nao | Padrao `gemini-2.5-flash`. Serve para trocar de modelo sem novo deploy de codigo |
+
+```sh
+supabase secrets set GEMINI_API_KEY=...
+supabase functions deploy analyze-finances
+```
+
+O `responseSchema` do Gemini aceita apenas um subconjunto do JSON Schema — em
+particular **nao** aceita `additionalProperties`. Ao mexer em `INSIGHTS_SCHEMA`,
+manter-se nesse subconjunto.

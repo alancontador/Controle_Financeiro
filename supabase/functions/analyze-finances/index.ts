@@ -1,14 +1,22 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import Anthropic from "npm:@anthropic-ai/sdk@0.123.0";
+import { GoogleGenAI } from "npm:@google/genai@2.19.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Modelo do Gemini. Sobrescrevivel por env para poder subir de versao sem deploy
+// de codigo; gemini-2.5-flash e o que roda na camada gratuita.
+const GEMINI_MODEL = Deno.env.get("GEMINI_MODEL") || "gemini-2.5-flash";
+
 // Formato da resposta da IA. O front (useInsights / componentes de Insights)
 // depende desta forma exata, entao mudar aqui exige mudar la tambem.
+//
+// Atencao: o responseSchema do Gemini aceita so um subconjunto do JSON Schema
+// (type, properties, required, items, enum, description, min/max). NAO use
+// additionalProperties aqui - a API rejeita.
 const INSIGHTS_SCHEMA = {
   type: "object",
   properties: {
@@ -20,7 +28,6 @@ const INSIGHTS_SCHEMA = {
         main_message: { type: "string", description: "Mensagem principal de ate 2 frases" },
       },
       required: ["health_score", "health_status", "main_message"],
-      additionalProperties: false,
     },
     patterns: {
       type: "array",
@@ -34,7 +41,6 @@ const INSIGHTS_SCHEMA = {
           category: { type: "string" },
         },
         required: ["title", "description", "type", "category"],
-        additionalProperties: false,
       },
     },
     savings_tips: {
@@ -50,7 +56,6 @@ const INSIGHTS_SCHEMA = {
           category: { type: "string" },
         },
         required: ["title", "description", "potential_savings", "difficulty", "category"],
-        additionalProperties: false,
       },
     },
     monthly_trend: {
@@ -60,7 +65,6 @@ const INSIGHTS_SCHEMA = {
         description: { type: "string" },
       },
       required: ["trend", "description"],
-      additionalProperties: false,
     },
     action_items: {
       type: "array",
@@ -73,12 +77,10 @@ const INSIGHTS_SCHEMA = {
           timeframe: { type: "string" },
         },
         required: ["action", "priority", "timeframe"],
-        additionalProperties: false,
       },
     },
   },
   required: ["summary", "patterns", "savings_tips", "monthly_trend", "action_items"],
-  additionalProperties: false,
 };
 
 serve(async (req) => {
@@ -186,21 +188,22 @@ ORÇAMENTOS DEFINIDOS:
 ${budgets?.length ? budgets.map((b: any) => `- ${b.category?.name || "Categoria"}: R$ ${b.amount} (${b.period})`).join("\n") : "Nenhum orçamento definido"}
 `;
 
-    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
-    if (!ANTHROPIC_API_KEY) {
-      throw new Error("ANTHROPIC_API_KEY nao esta configurada");
+    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+    if (!GEMINI_API_KEY) {
+      throw new Error("GEMINI_API_KEY nao esta configurada");
     }
 
-    console.log("Chamando a API da Anthropic para a analise financeira...");
+    console.log(`Chamando o Gemini (${GEMINI_MODEL}) para a analise financeira...`);
 
-    const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
+    const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 
-    let message;
+    let rawText: string | undefined;
     try {
-      message = await anthropic.messages.create({
-        model: "claude-opus-5",
-        max_tokens: 16000,
-        system: `Voce e um consultor financeiro pessoal especializado em analise de gastos e economia. Seu papel e analisar os dados financeiros do usuario e fornecer insights acionaveis.
+      const result = await ai.models.generateContent({
+        model: GEMINI_MODEL,
+        contents: `Analise os dados financeiros abaixo e forneca insights detalhados:\n\n${financialContext}`,
+        config: {
+          systemInstruction: `Voce e um consultor financeiro pessoal especializado em analise de gastos e economia. Seu papel e analisar os dados financeiros do usuario e fornecer insights acionaveis.
 
 Responda SEMPRE em portugues brasileiro.
 
@@ -210,49 +213,49 @@ Diretrizes:
 3. Priorize sugestoes por impacto financeiro
 4. Seja encorajador mas realista
 5. Identifique tanto pontos positivos quanto areas de melhoria`,
-        messages: [
-          {
-            role: "user",
-            content: `Analise os dados financeiros abaixo e forneca insights detalhados:\n\n${financialContext}`,
-          },
-        ],
-        output_config: {
-          format: { type: "json_schema", schema: INSIGHTS_SCHEMA },
+          responseMimeType: "application/json",
+          responseSchema: INSIGHTS_SCHEMA,
         },
       });
+      rawText = result.text;
     } catch (err) {
-      // Erros da API viram status HTTP proprios para a UI diferenciar
-      // "tente de novo" de "arrume a configuracao".
-      if (err instanceof Anthropic.RateLimitError) {
+      // A camada gratuita do Gemini tem limite de requisicoes, entao o 429 e um
+      // caso esperado e nao um bug: vira mensagem propria para a UI.
+      const msg = err instanceof Error ? err.message : String(err);
+      const status = (err as { status?: number; code?: number })?.status ??
+        (err as { status?: number; code?: number })?.code;
+
+      if (status === 429 || /\b429\b|RESOURCE_EXHAUSTED|quota/i.test(msg)) {
         return new Response(
           JSON.stringify({ error: "Limite de requisicoes atingido. Tente novamente em alguns minutos." }),
           { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      if (err instanceof Anthropic.AuthenticationError) {
+      if (status === 401 || status === 403 || /API key|UNAUTHENTICATED|PERMISSION_DENIED/i.test(msg)) {
         return new Response(
           JSON.stringify({ error: "Chave da API invalida. Verifique a configuracao do servico." }),
           { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      if (err instanceof Anthropic.APIError) {
-        console.error("Erro da API Anthropic:", err.status, err.message);
-        throw new Error("Falha ao obter a analise da IA");
-      }
-      throw err;
+      console.error("Erro na chamada ao Gemini:", msg);
+      throw new Error("Falha ao obter a analise da IA");
     }
 
-    if (message.stop_reason === "refusal") {
-      console.error("Requisicao recusada:", message.stop_details);
+    if (!rawText) {
+      // Resposta vazia costuma ser bloqueio por filtro de seguranca.
+      console.error("Gemini retornou resposta vazia");
       throw new Error("Nao foi possivel gerar a analise para estes dados");
     }
 
-    const textBlock = message.content.find((block) => block.type === "text");
-    if (!textBlock || textBlock.type !== "text") {
+    let insights;
+    try {
+      // responseMimeType application/json ja devolve JSON puro, mas tirar cercas
+      // de markdown evita quebrar caso o modelo escape do formato.
+      insights = JSON.parse(rawText.trim().replace(/^```(?:json)?\s*|\s*```$/g, ""));
+    } catch {
+      console.error("JSON invalido vindo do Gemini:", rawText.slice(0, 500));
       throw new Error("Resposta da IA em formato inesperado");
     }
-
-    const insights = JSON.parse(textBlock.text);
 
     return new Response(JSON.stringify({ insights, rawData: { totalIncome, totalExpenses, expensesByCategory } }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
