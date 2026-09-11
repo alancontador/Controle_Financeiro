@@ -5,7 +5,10 @@ import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { groupIntoLines } from './lines';
 import type { PdfLine, PdfTextItem } from './types';
 
-pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
+// A versao na query serve para duas coisas: o worker precisa casar com a versao
+// da API, e a URL diferente invalida qualquer cache (ou module map da aba) que
+// tenha guardado o arquivo servido com MIME errado antes do ajuste do nginx.
+pdfjs.GlobalWorkerOptions.workerSrc = `${workerUrl}?v=${pdfjs.version}`;
 
 /**
  * Le um PDF no navegador e devolve as linhas visuais de todas as paginas, na
