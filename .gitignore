@@ -27,3 +27,7 @@ dist-ssr
 .env
 .env.local
 .env.*.local
+
+# Testes contra arquivos reais desta maquina (dados pessoais)
+*.local.test.ts
+scripts/.local/

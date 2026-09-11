@@ -4,231 +4,38 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Upload, AlertCircle } from 'lucide-react';
+import { Upload, AlertCircle, CheckCircle2, XCircle } from 'lucide-react';
+import { extractPdfLines } from '@/lib/pdf/extractText';
+import { parseBradescoFatura, type BradescoItem, type BradescoParseResult } from '@/lib/pdf/bradesco';
+import { CARD_CATEGORIES } from '@/lib/pdf/autoCategory';
 
-interface ParsedItem {
-  holder_name: string;
-  transaction_date: string;
-  description: string;
-  amount: number;
-  category: string;
-  installment_current: number | null;
-  installment_total: number | null;
-}
+/** Item no formato que a tabela invoice_items espera. */
+export type ImportedInvoiceItem = BradescoItem & { is_previous_balance: boolean };
 
 interface Props {
   open: boolean;
   onClose: () => void;
-  onConfirm: (items: any[], previousBalance: number) => void;
+  onConfirm: (items: ImportedInvoiceItem[], previousBalance: number) => void;
 }
 
-const CATEGORIES = [
-  'Alimentação', 'Supermercado', 'Farmácia', 'Combustível', 'Vestuário',
-  'Transporte', 'Saúde', 'Lazer', 'Assinaturas', 'Outros',
-];
+type Conferencia = Pick<BradescoParseResult, 'totalFatura' | 'parsedTotal' | 'cardTotals' | 'dueDate'>;
 
-function autoCategory(desc: string): string {
-  const d = desc.toUpperCase();
-  if (d.includes('SUPERMERCADO') || d.includes('SUPERMERC')) return 'Supermercado';
-  if (d.includes('FARMACIA') || d.includes('DROGARIA') || d.includes('DROGA')) return 'Farmácia';
-  if (d.includes('POSTO') || d.includes('SHELL') || d.includes('IPIRANGA') || d.includes('COMBUSTI')) return 'Combustível';
-  if (d.includes('UBER') || d.includes('99') || d.includes('CABIFY')) return 'Transporte';
-  if (d.includes('NETFLIX') || d.includes('SPOTIFY') || d.includes('DISNEY') || d.includes('AMAZON PRIME') || d.includes('HBO')) return 'Assinaturas';
-  if (d.includes('RESTAUR') || d.includes('LANCHON') || d.includes('PADARIA') || d.includes('IFOOD') || d.includes('RAPPI')) return 'Alimentação';
-  if (d.includes('SAUDE') || d.includes('HOSPITAL') || d.includes('CLINICA') || d.includes('MEDIC')) return 'Saúde';
-  return 'Outros';
-}
-
-function parseBradescoPdf(text: string): { items: ParsedItem[]; previousBalance: number; totalFatura?: number; error?: string } {
-  const lines = text.split('\n').map(l => l.replace(/\s+/g, ' ').trim()).filter(Boolean);
-  const items: ParsedItem[] = [];
-  let previousBalance = 0;
-  let totalFatura: number | undefined;
-  let currentHolder = '';
-
-  // Lines to ignore
-  const ignorePatterns = [
-    /^Data\s+Hist[oó]rico/i,
-    /Moeda\s+de\s+origem/i,
-    /^US\$/i,
-    /Cota[çc][aã]o/i,
-    /^Total\s+para\s+/i,
-    /\d{4}\.\d{4}\.\d{4}\.\d{4}/,
-    /Extrato\s+em\s+Aberto/i,
-  ];
-
-  const shouldIgnore = (line: string) => ignorePatterns.some(p => p.test(line));
-
-  // Detect holder: line containing "- ELO" or similar card brand suffix
-  const holderPattern = /^(.+?)\s*-\s*(ELO|VISA|MASTERCARD|MASTER|AMEX|HIPERCARD)/i;
-
-  // Date pattern at start of line
-  const datePattern = /^(\d{2}\/\d{2})\s*(.*)/;
-
-  // Value pattern (monetary)
-  const valuePattern = /^-?\d{1,3}(\.\d{3})*,\d{2}$/;
-  const valueExtract = /(-?\d{1,3}(?:\.\d{3})*,\d{2})\s*$/;
-
-  // Total da fatura
-  const totalFaturaPattern = /Total\s+da\s+Fatura\s+em\s+Real/i;
-
-  let i = 0;
-  while (i < lines.length) {
-    const line = lines[i];
-
-    // Check total da fatura
-    if (totalFaturaPattern.test(line)) {
-      const valMatch = line.match(valueExtract);
-      if (valMatch) {
-        totalFatura = parseFloat(valMatch[1].replace(/\./g, '').replace(',', '.'));
-      } else if (i + 1 < lines.length) {
-        const nextVal = lines[i + 1].trim();
-        if (valuePattern.test(nextVal)) {
-          totalFatura = parseFloat(nextVal.replace(/\./g, '').replace(',', '.'));
-          i++;
-        }
-      }
-      i++;
-      continue;
-    }
-
-    // Ignore lines
-    if (shouldIgnore(line)) { i++; continue; }
-
-    // Detect holder
-    const holderMatch = line.match(holderPattern);
-    if (holderMatch) {
-      currentHolder = holderMatch[1].trim();
-      i++;
-      continue;
-    }
-
-    // Detect saldo anterior
-    if (/saldo\s+anterior/i.test(line)) {
-      const valMatch = line.match(valueExtract);
-      if (valMatch) {
-        previousBalance = parseFloat(valMatch[1].replace(/\./g, '').replace(',', '.')) || 0;
-      } else if (i + 1 < lines.length) {
-        const nextVal = lines[i + 1].trim();
-        if (valuePattern.test(nextVal)) {
-          previousBalance = parseFloat(nextVal.replace(/\./g, '').replace(',', '.')) || 0;
-          i++;
-        }
-      }
-      i++;
-      continue;
-    }
-
-    // Detect transaction starting with date
-    const dateMatch = line.match(datePattern);
-    if (dateMatch && currentHolder) {
-      const dateStr = dateMatch[1];
-      let descParts: string[] = [];
-      const restOfLine = dateMatch[2]?.trim() || '';
-
-      // Check if rest of line ends with a value
-      const inlineVal = restOfLine.match(valueExtract);
-      if (inlineVal) {
-        // Value is on the same line
-        const desc = restOfLine.replace(valueExtract, '').trim();
-        if (desc) descParts.push(desc);
-        const amount = parseFloat(inlineVal[1].replace(/\./g, '').replace(',', '.')) || 0;
-        pushItem(items, currentHolder, dateStr, descParts.join(' '), amount);
-        i++;
-        continue;
-      }
-
-      // Value not on same line — accumulate description lines
-      if (restOfLine) descParts.push(restOfLine);
-      let j = i + 1;
-      let foundValue = false;
-      while (j < lines.length) {
-        const nextLine = lines[j];
-        // If next line is a new date, holder, or ignored, stop
-        if (datePattern.test(nextLine) || holderPattern.test(nextLine) || totalFaturaPattern.test(nextLine)) break;
-        if (shouldIgnore(nextLine)) { j++; continue; }
-
-        const valM = nextLine.match(valueExtract);
-        if (valM) {
-          // Check if there's description before the value on this line
-          const beforeVal = nextLine.replace(valueExtract, '').trim();
-          if (beforeVal && !/saldo\s+anterior/i.test(beforeVal)) descParts.push(beforeVal);
-          const amount = parseFloat(valM[1].replace(/\./g, '').replace(',', '.')) || 0;
-          pushItem(items, currentHolder, dateStr, descParts.join(' '), amount);
-          foundValue = true;
-          j++;
-          break;
-        }
-
-        // Pure value line
-        if (valuePattern.test(nextLine.trim())) {
-          const amount = parseFloat(nextLine.trim().replace(/\./g, '').replace(',', '.')) || 0;
-          pushItem(items, currentHolder, dateStr, descParts.join(' '), amount);
-          foundValue = true;
-          j++;
-          break;
-        }
-
-        // Otherwise it's part of the description
-        descParts.push(nextLine);
-        j++;
-      }
-
-      if (!foundValue && descParts.length > 0) {
-        // No value found — skip this entry
-      }
-      i = j;
-      continue;
-    }
-
-    i++;
-  }
-
-  if (items.length === 0) {
-    console.warn('[ImportPdfModal] Nenhum lançamento identificado. Primeiras 50 linhas do texto extraído:');
-    lines.slice(0, 50).forEach((l, idx) => console.log(`  ${idx + 1}: ${l}`));
-    return { items: [], previousBalance: 0, error: 'Não foi possível identificar lançamentos no PDF. Verifique se o formato é compatível com extratos do Bradesco.' };
-  }
-
-  return { items, previousBalance, totalFatura };
-}
-
-function pushItem(items: ParsedItem[], holder: string, dateStr: string, desc: string, amount: number) {
-  let instCurrent: number | null = null;
-  let instTotal: number | null = null;
-  const instMatch = desc.match(/(\d+)\/(\d+)/);
-  if (instMatch) {
-    const a = parseInt(instMatch[1]);
-    const b = parseInt(instMatch[2]);
-    if (a <= b && b <= 99 && a >= 1) {
-      instCurrent = a;
-      instTotal = b;
-    }
-  }
-
-  const year = new Date().getFullYear();
-  const [dd, mm] = dateStr.split('/');
-  const isoDate = `${year}-${mm}-${dd}`;
-
-  const isPrevBalance = /saldo\s+anterior/i.test(desc);
-
-  items.push({
-    holder_name: holder,
-    transaction_date: isoDate,
-    description: desc.trim(),
-    amount,
-    category: isPrevBalance ? 'Outros' : autoCategory(desc),
-    installment_current: instCurrent,
-    installment_total: instTotal,
-  });
-}
+const sameCents = (a: number, b: number) => Math.abs(a - b) < 0.005;
 
 export function ImportPdfModal({ open, onClose, onConfirm }: Props) {
-  const [items, setItems] = useState<ParsedItem[]>([]);
+  const [items, setItems] = useState<BradescoItem[]>([]);
   const [previousBalance, setPreviousBalance] = useState(0);
+  const [conferencia, setConferencia] = useState<Conferencia | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const reset = () => {
+    setItems([]);
+    setPreviousBalance(0);
+    setConferencia(null);
+    setError('');
+  };
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -238,61 +45,23 @@ export function ImportPdfModal({ open, onClose, onConfirm }: Props) {
     setError('');
 
     try {
-      // Use FileReader to read the PDF as text (basic extraction)
-      // For proper PDF parsing we'll extract text using a simple approach
-      const text = await extractTextFromPdf(file);
-      const result = parseBradescoPdf(text);
-      
+      const lines = await extractPdfLines(await file.arrayBuffer());
+      const result = parseBradescoFatura(lines);
+
       if (result.error) {
         setError(result.error);
       } else {
         setItems(result.items);
         setPreviousBalance(result.previousBalance);
+        setConferencia(result);
       }
-    } catch (err: any) {
-      setError('Erro ao processar o PDF: ' + (err.message || 'formato incompatível'));
+    } catch (err) {
+      setError('Erro ao processar o PDF: ' + (err instanceof Error ? err.message : 'formato incompatível'));
+    } finally {
+      setLoading(false);
+      // Permite selecionar o mesmo arquivo de novo depois de um erro.
+      e.target.value = '';
     }
-    setLoading(false);
-  };
-
-  const extractTextFromPdf = async (file: File): Promise<string> => {
-    // Basic PDF text extraction - reads the raw content
-    const buffer = await file.arrayBuffer();
-    const bytes = new Uint8Array(buffer);
-    
-    // Try to extract text from PDF stream objects
-    let text = '';
-    const decoder = new TextDecoder('latin1');
-    const rawText = decoder.decode(bytes);
-    
-    // Extract text between BT and ET markers (PDF text objects)
-    const textBlocks = rawText.match(/BT[\s\S]*?ET/g) || [];
-    for (const block of textBlocks) {
-      // Extract text from Tj and TJ operators
-      const tjMatches = block.match(/\(([^)]*)\)\s*Tj/g) || [];
-      for (const m of tjMatches) {
-        const content = m.match(/\(([^)]*)\)/)?.[1] || '';
-        text += content + '\n';
-      }
-      // TJ array operator
-      const tjArrays = block.match(/\[([^\]]*)\]\s*TJ/g) || [];
-      for (const arr of tjArrays) {
-        const strings = arr.match(/\(([^)]*)\)/g) || [];
-        for (const s of strings) {
-          text += s.replace(/[()]/g, '');
-        }
-        text += '\n';
-      }
-    }
-
-    // Fallback: try extracting readable text directly
-    if (!text.trim()) {
-      // Extract any readable strings
-      const readable = rawText.match(/[\w\d\s.,;:!?/\-àáâãéêíóôõúçÀÁÂÃÉÊÍÓÔÕÚÇ]{4,}/g) || [];
-      text = readable.join('\n');
-    }
-
-    return text;
   };
 
   const updateItemCategory = (index: number, category: string) => {
@@ -304,19 +73,9 @@ export function ImportPdfModal({ open, onClose, onConfirm }: Props) {
   };
 
   const handleConfirm = () => {
-    const mapped = items.map(item => ({
-      holder_name: item.holder_name,
-      transaction_date: item.transaction_date,
-      description: item.description,
-      amount: item.amount,
-      category: item.category,
-      installment_current: item.installment_current,
-      installment_total: item.installment_total,
-      is_previous_balance: false,
-    }));
+    const mapped: ImportedInvoiceItem[] = items.map(item => ({ ...item, is_previous_balance: false }));
     onConfirm(mapped, previousBalance);
-    setItems([]);
-    setPreviousBalance(0);
+    reset();
     onClose();
   };
 
@@ -324,23 +83,25 @@ export function ImportPdfModal({ open, onClose, onConfirm }: Props) {
   const fmtDate = (d: string) => {
     if (!d) return '';
     const [y, m, day] = d.split('-');
-    return `${day}/${m}`;
+    return `${day}/${m}/${y}`;
   };
 
   // Group by holder
-  const grouped = items.reduce<Record<string, ParsedItem[]>>((acc, item) => {
+  const grouped = items.reduce<Record<string, BradescoItem[]>>((acc, item) => {
     if (!acc[item.holder_name]) acc[item.holder_name] = [];
     acc[item.holder_name].push(item);
     return acc;
   }, {});
 
   const total = items.reduce((s, i) => s + i.amount, 0) + previousBalance;
+  const totalOk = conferencia?.totalFatura !== undefined && sameCents(conferencia.parsedTotal, conferencia.totalFatura);
+  const cardsOk = conferencia?.cardTotals.every(c => sameCents(c.declared, c.parsed)) ?? false;
 
   return (
-    <Dialog open={open} onOpenChange={() => { setItems([]); setError(''); onClose(); }}>
+    <Dialog open={open} onOpenChange={() => { reset(); onClose(); }}>
       <DialogContent className="sm:max-w-4xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Importar Extrato PDF (Bradesco)</DialogTitle>
+          <DialogTitle>Importar Fatura PDF (Bradesco)</DialogTitle>
         </DialogHeader>
 
         <div className="mb-4">
@@ -360,9 +121,33 @@ export function ImportPdfModal({ open, onClose, onConfirm }: Props) {
 
         {items.length > 0 && (
           <>
-            {previousBalance > 0 && (
-              <div className="bg-muted rounded-lg p-3 mb-4">
-                <p className="text-sm font-medium">Saldo Anterior: {fmt(previousBalance)}</p>
+            {conferencia && (
+              <div className={`rounded-lg p-3 mb-4 border ${totalOk && cardsOk ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-amber-500/10 border-amber-500/30'}`}>
+                <p className="text-sm font-semibold mb-2 flex items-center gap-1">
+                  {totalOk && cardsOk
+                    ? <><CheckCircle2 className="w-4 h-4 text-emerald-600" /> Conferência: os valores lidos batem com os declarados na fatura</>
+                    : <><XCircle className="w-4 h-4 text-amber-600" /> Conferência: há diferença entre o que foi lido e o que a fatura declara — revise antes de confirmar</>}
+                </p>
+                <ul className="text-sm space-y-0.5">
+                  {conferencia.dueDate && <li>Vencimento: {fmtDate(conferencia.dueDate)}</li>}
+                  {previousBalance > 0 && <li>Saldo anterior: {fmt(previousBalance)}</li>}
+                  {conferencia.cardTotals.map(c => (
+                    <li key={c.holder} className="flex items-center gap-1">
+                      {sameCents(c.declared, c.parsed)
+                        ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        : <XCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />}
+                      {c.holder}: lido {fmt(c.parsed)} · fatura {fmt(c.declared)}
+                    </li>
+                  ))}
+                  {conferencia.totalFatura !== undefined && (
+                    <li className="flex items-center gap-1 font-medium">
+                      {totalOk
+                        ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        : <XCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />}
+                      Total da fatura: lido {fmt(conferencia.parsedTotal)} · fatura {fmt(conferencia.totalFatura)}
+                    </li>
+                  )}
+                </ul>
               </div>
             )}
 
@@ -387,7 +172,7 @@ export function ImportPdfModal({ open, onClose, onConfirm }: Props) {
                         const globalIdx = startIndex + idx;
                         return (
                           <TableRow key={idx}>
-                            <TableCell>{fmtDate(item.transaction_date)}</TableCell>
+                            <TableCell className="whitespace-nowrap">{fmtDate(item.transaction_date)}</TableCell>
                             <TableCell>
                               <Input
                                 value={item.description}
@@ -400,12 +185,12 @@ export function ImportPdfModal({ open, onClose, onConfirm }: Props) {
                                 ? `${item.installment_current}/${item.installment_total}`
                                 : '-'}
                             </TableCell>
-                            <TableCell className="text-right">{fmt(item.amount)}</TableCell>
+                            <TableCell className={`text-right whitespace-nowrap ${item.amount < 0 ? 'text-emerald-600' : ''}`}>{fmt(item.amount)}</TableCell>
                             <TableCell>
                               <Select value={item.category} onValueChange={v => updateItemCategory(globalIdx, v)}>
                                 <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
                                 <SelectContent>
-                                  {CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                                  {CARD_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                                 </SelectContent>
                               </Select>
                             </TableCell>
