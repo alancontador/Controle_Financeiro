@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Loader2, Plus, ArrowLeft, Upload, FileSpreadsheet, Trash2 } from 'lucide-react';
+import { Loader2, Plus, ArrowLeft, Upload, FileSpreadsheet, Trash2, Scissors } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { MobileNav } from '@/components/layout/MobileNav';
@@ -13,6 +13,9 @@ import { useAuth } from '@/hooks/useAuth';
 import { useCreditCards, useInvoices } from '@/hooks/useCreditCards';
 import { useInvoiceImport, type Categorization, type ImportableItem } from '@/hooks/useInvoiceImport';
 import { usePeople } from '@/hooks/usePeople';
+import { SplitItemDialog } from '@/components/cards/SplitItemDialog';
+import { isPaymentLine } from '@/lib/cards/mirror';
+import type { InvoiceItem } from '@/hooks/useCreditCards';
 import { UpcomingInvoices } from '@/components/cards/UpcomingInvoices';
 import { CARD_KIND_LABEL, type CardKind, type InvoiceCard } from '@/lib/cards/kinds';
 import { AddItemModal } from '@/components/cards/AddItemModal';
@@ -30,7 +33,9 @@ const CardInvoices = () => {
   const {
     card, invoices, holders, items, loading,
     fetchAll, fetchItems, createInvoice, deleteInvoice, addItem, addItemsBatch, updatePreviousBalance, reassignItem,
+    splits, setItemSplits,
   } = useInvoices(cardId || '');
+  const [splittingItem, setSplittingItem] = useState<InvoiceItem | null>(null);
   const { people: householdPeople } = usePeople();
   const { usage: usageByCard } = useCreditCards();
 
@@ -304,14 +309,26 @@ const CardInvoices = () => {
                                           <TableCell>{item.description}</TableCell>
                                           <TableCell className="text-muted-foreground">{item.category}</TableCell>
                                           <TableCell>
-                                            {item.holder_name === 'Pagamentos' ? (
+                                            {item.holder_name === 'Pagamentos' || isPaymentLine(item.description) ? (
                                               <span className="text-muted-foreground">-</span>
+                                            ) : splits[item.id]?.length ? (
+                                              <button
+                                                type="button"
+                                                onClick={() => setSplittingItem(item)}
+                                                className="text-xs text-left text-primary hover:underline flex items-center gap-1"
+                                                title="Editar divisão"
+                                              >
+                                                <Scissors className="w-3 h-3 shrink-0" />
+                                                <span>
+                                                  {splits[item.id].map((s) => `${s.person.split(' ')[0]} ${Math.round((s.amount / Number(item.amount)) * 100)}%`).join(' · ')}
+                                                </span>
+                                              </button>
                                             ) : (
                                               <Select
                                                 value={item.assigned_to || item.holder_name}
                                                 onValueChange={(v) => reassignItem(item, v === item.holder_name ? null : v)}
                                               >
-                                                <SelectTrigger className={`h-8 text-xs w-[190px] ${item.assigned_to ? 'border-primary/60 text-primary' : ''}`} title={item.assigned_to ? `Compra no cartão de ${item.holder_name}, realocada` : 'Quem é responsável por esta despesa'}>
+                                                <SelectTrigger className={`h-8 text-xs w-[190px] inline-flex ${item.assigned_to ? 'border-primary/60 text-primary' : ''}`} title={item.assigned_to ? `Compra no cartão de ${item.holder_name}, realocada` : 'Quem é responsável por esta despesa'}>
                                                   <SelectValue />
                                                 </SelectTrigger>
                                                 <SelectContent>
@@ -320,6 +337,17 @@ const CardInvoices = () => {
                                                   ))}
                                                 </SelectContent>
                                               </Select>
+                                            )}
+                                            {item.holder_name !== 'Pagamentos' && !isPaymentLine(item.description) && !splits[item.id]?.length && (
+                                              <button
+                                                type="button"
+                                                onClick={() => setSplittingItem(item)}
+                                                className="ml-1 inline-flex items-center text-muted-foreground hover:text-primary align-middle"
+                                                title="Dividir entre pessoas"
+                                                aria-label="Dividir entre pessoas"
+                                              >
+                                                <Scissors className="w-3.5 h-3.5" />
+                                              </button>
                                             )}
                                           </TableCell>
                                           <TableCell>
@@ -373,6 +401,14 @@ const CardInvoices = () => {
           onConfirm={handleExcelImport}
           holders={uniqueHolders}
         />
+        <SplitItemDialog
+          item={splittingItem}
+          current={splittingItem ? splits[splittingItem.id] ?? [] : []}
+          people={householdPeople}
+          onClose={() => setSplittingItem(null)}
+          onSave={(shares) => (splittingItem ? setItemSplits(splittingItem, shares) : Promise.resolve(false))}
+        />
+
         <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>

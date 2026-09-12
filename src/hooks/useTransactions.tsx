@@ -213,6 +213,9 @@ export function useTransactions() {
       // Trocar a pessoa de uma despesa vinda de fatura realoca a compra na fatura tambem.
       const saved = data as Transaction & { invoice_item_id?: string | null };
       if ("holder_name" in updates && saved.invoice_item_id) {
+        // Item dividido: cada despesa e uma parte; nao mexe na realocacao do item inteiro.
+        const { count } = await supabase.from("invoice_item_splits").select("id", { count: "exact", head: true }).eq("item_id", saved.invoice_item_id);
+        if ((count ?? 0) > 0) return data as Transaction;
         const { data: item } = await supabase.from("invoice_items").select("holder_name").eq("id", saved.invoice_item_id).maybeSingle();
         const assigned = saved.holder_name && saved.holder_name !== item?.holder_name ? saved.holder_name : null;
         await supabase.from("invoice_items").update({ assigned_to: assigned }).eq("id", saved.invoice_item_id);

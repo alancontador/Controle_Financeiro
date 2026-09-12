@@ -375,6 +375,30 @@ export type Database = {
           },
         ]
       }
+      invoice_item_splits: {
+        Row: {
+          id: string
+          item_id: string
+          person: string
+          amount: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          item_id: string
+          person: string
+          amount: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          item_id?: string
+          person?: string
+          amount?: number
+          created_at?: string
+        }
+        Relationships: []
+      }
       invoice_items: {
         Row: {
           amount: number

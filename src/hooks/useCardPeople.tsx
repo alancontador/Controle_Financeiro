@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { effectivePerson } from '@/lib/people';
+import { personShares, type Share } from '@/lib/cards/split';
 import type { CardKind } from '@/lib/cards/kinds';
 
 export interface PersonCardSpend {
@@ -59,8 +59,15 @@ export function useCardPeople(): CardPeopleData {
 
     const invoiceIds = [...latest.values()].map((i) => i.id);
     const items = invoiceIds.length
-      ? (await supabase.from('invoice_items').select('invoice_id, holder_name, assigned_to, card_last_four, card_kind, description, amount').in('invoice_id', invoiceIds)).data ?? []
+      ? (await supabase.from('invoice_items').select('id, invoice_id, holder_name, assigned_to, card_last_four, card_kind, description, amount').in('invoice_id', invoiceIds)).data ?? []
       : [];
+
+    const itemIds = items.map((i) => (i as { id?: string }).id).filter(Boolean) as string[];
+    const splitsByItem = new Map<string, Share[]>();
+    if (itemIds.length) {
+      const { data: parts } = await supabase.from('invoice_item_splits').select('item_id, person, amount').in('item_id', itemIds);
+      for (const p of parts ?? []) splitsByItem.set(p.item_id, [...(splitsByItem.get(p.item_id) ?? []), { person: p.person, amount: Number(p.amount) }]);
+    }
 
     const kindByCardNumber = new Map<string, CardKind | null>();
     for (const h of holdersRes.data ?? []) if (h.last_four) kindByCardNumber.set(`${h.card_id}:${h.last_four}`, (h.kind as CardKind) ?? null);
@@ -73,28 +80,31 @@ export function useCardPeople(): CardPeopleData {
       for (const it of items) {
         if (it.invoice_id !== inv.id) continue;
         if (RE_PAYMENT.test(it.description)) continue;
-        const person = effectivePerson(it);
-        const p = people.get(person) ?? { person, total: 0, share: 0, cards: [] };
-        p.total += Number(it.amount);
-        const lf = it.card_last_four ?? '';
-        let c = p.cards.find((x) => x.lastFour === lf);
-        if (!c) {
-          c = {
-            lastFour: lf,
-            kind: (it.card_kind as CardKind) ?? kindByCardNumber.get(`${cardId}:${lf}`) ?? null,
-            cardHolder: it.holder_name && it.holder_name !== person ? it.holder_name : undefined,
-            total: 0,
-            itemCount: 0,
-          };
-          p.cards.push(c);
-        }
-        c.total += Number(it.amount);
-        c.itemCount += 1;
-        people.set(person, p);
+        // Uma compra dividida conta uma parte para cada pessoa; realocada, conta para o responsavel.
+        for (const sh of personShares({ ...it, amount: Number(it.amount) }, splitsByItem.get(it.id) ?? [])) {
+          const person = sh.person;
+          const p = people.get(person) ?? { person, total: 0, share: 0, cards: [] };
+          p.total += sh.amount;
+          const lf = it.card_last_four ?? '';
+          let c = p.cards.find((x) => x.lastFour === lf);
+          if (!c) {
+            c = {
+              lastFour: lf,
+              kind: (it.card_kind as CardKind) ?? kindByCardNumber.get(`${cardId}:${lf}`) ?? null,
+              cardHolder: it.holder_name && it.holder_name !== person ? it.holder_name : undefined,
+              total: 0,
+              itemCount: 0,
+            };
+            p.cards.push(c);
+          }
+          c.total += sh.amount;
+          c.itemCount += 1;
+          people.set(person, p);
 
-        const o = overallMap.get(person) ?? { person, total: 0, share: 0, cards: [] };
-        o.total += Number(it.amount);
-        overallMap.set(person, o);
+          const o = overallMap.get(person) ?? { person, total: 0, share: 0, cards: [] };
+          o.total += sh.amount;
+          overallMap.set(person, o);
+        }
       }
       const list = [...people.values()].map((p) => ({ ...p, total: round2(p.total), cards: p.cards.map((c) => ({ ...c, total: round2(c.total) })).sort((a, b) => b.total - a.total) }));
       const grand = list.reduce((s, p) => s + p.total, 0);

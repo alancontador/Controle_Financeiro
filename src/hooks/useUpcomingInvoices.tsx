@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { projectUpcomingInvoices, projectUpcomingInvoicesByPerson, type MonthProjection, type ProjectionItem } from '@/lib/cards/projection';
 import { addMonths, monthKey, toIsoDate } from '@/lib/dates';
+import { personShares, type Share } from '@/lib/cards/split';
 
 export interface UpcomingInvoicesData {
   /** Projecao mes a mes (todos os cartoes, ou so o cartao pedido). */
@@ -36,7 +37,7 @@ export function useUpcomingInvoices(cardId?: string, months = 6): UpcomingInvoic
 
     let query = supabase
       .from('invoice_items')
-      .select('holder_name, assigned_to, description, amount, installment_current, installment_total, invoice:invoices!inner(card_id, period_end)');
+      .select('id, holder_name, assigned_to, description, amount, installment_current, installment_total, invoice:invoices!inner(card_id, period_end)');
     if (cardId) query = query.eq('invoice.card_id', cardId);
 
     const threeMonthsAgo = addMonths(toIsoDate(new Date()), -3);
@@ -45,17 +46,24 @@ export function useUpcomingInvoices(cardId?: string, months = 6): UpcomingInvoic
       supabase.from('transactions').select('amount').eq('user_id', user.id).eq('type', 'income').gte('date', threeMonthsAgo),
     ]);
 
-    const items: ProjectionItem[] = (itemsRes.data ?? []).map((row) => {
+    const rows = itemsRes.data ?? [];
+    const splitsByItem = new Map<string, Share[]>();
+    if (rows.length) {
+      const { data: parts } = await supabase.from('invoice_item_splits').select('item_id, person, amount').in('item_id', rows.map((r) => r.id));
+      for (const p of parts ?? []) splitsByItem.set(p.item_id, [...(splitsByItem.get(p.item_id) ?? []), { person: p.person, amount: Number(p.amount) }]);
+    }
+    // Compra dividida vira um item por parte (a parcela segue a fracao de cada pessoa).
+    const items: ProjectionItem[] = rows.flatMap((row) => {
       const inv = row.invoice as unknown as { card_id: string; period_end: string };
-      return {
+      return personShares({ ...row, amount: Number(row.amount) }, splitsByItem.get(row.id) ?? []).map((sh) => ({
         cardId: inv.card_id,
-        holder: row.assigned_to?.trim() || row.holder_name,
+        holder: sh.person,
         invoiceMonth: monthKey(inv.period_end),
         description: row.description,
-        amount: Number(row.amount),
+        amount: sh.amount,
         installment_current: row.installment_current,
         installment_total: row.installment_total,
-      };
+      }));
     });
 
     const proj = projectUpcomingInvoices(items, { months });

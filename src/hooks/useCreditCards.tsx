@@ -3,6 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { computeCardUsage, type CardUsage } from '@/lib/cards/usage';
+import { itemToTransaction, MIRROR_NOTE } from '@/lib/cards/mirror';
+import type { Share } from '@/lib/cards/split';
 
 export interface CreditCard {
   id: string;
@@ -47,6 +49,7 @@ export interface InvoiceItem {
   assigned_to: string | null;
   card_last_four: string | null;
   card_kind: 'principal' | 'adicional' | 'virtual' | null;
+  category_id: string | null;
   transaction_date: string;
   description: string;
   amount: number;
@@ -172,6 +175,8 @@ export function useInvoices(cardId: string) {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [holders, setHolders] = useState<CardHolder[]>([]);
   const [items, setItems] = useState<InvoiceItem[]>([]);
+  /** Divisao por pessoa dos lancamentos da fatura selecionada: item_id -> partes. */
+  const [splits, setSplits] = useState<Record<string, Share[]>>({});
   const [loading, setLoading] = useState(true);
   const [card, setCard] = useState<CreditCard | null>(null);
 
@@ -199,8 +204,58 @@ export function useInvoices(cardId: string) {
       .select('*')
       .eq('invoice_id', invoiceId)
       .order('transaction_date', { ascending: true });
-    setItems((data || []) as InvoiceItem[]);
+    const list = (data || []) as InvoiceItem[];
+    setItems(list);
+    const ids = list.map((i) => i.id);
+    const { data: parts } = ids.length
+      ? await supabase.from('invoice_item_splits').select('item_id, person, amount').in('item_id', ids)
+      : { data: [] as { item_id: string; person: string; amount: number }[] };
+    const map: Record<string, Share[]> = {};
+    for (const p of parts ?? []) (map[p.item_id] ??= []).push({ person: p.person, amount: Number(p.amount) });
+    setSplits(map);
   }, []);
+
+  /**
+   * Divide um lancamento entre pessoas (ou desfaz, com lista vazia). A compra
+   * continua uma so na fatura; as despesas espelhadas passam a ser uma por
+   * parte, para a analise por pessoa refletir a divisao.
+   */
+  const setItemSplits = async (item: InvoiceItem, shares: Share[]) => {
+    const { data: auth } = await supabase.auth.getUser();
+    const userId = auth.user?.id;
+    if (!userId) return false;
+
+    const { error: delErr } = await supabase.from('invoice_item_splits').delete().eq('item_id', item.id);
+    if (delErr) {
+      toast({ title: 'Erro ao dividir', description: delErr.message, variant: 'destructive' });
+      return false;
+    }
+    if (shares.length > 0) {
+      const { error } = await supabase.from('invoice_item_splits').insert(shares.map((s) => ({ item_id: item.id, person: s.person, amount: s.amount })));
+      if (error) {
+        toast({ title: 'Erro ao dividir', description: error.message, variant: 'destructive' });
+        return false;
+      }
+    }
+
+    // Re-espelha: apaga as despesas do item e grava uma por parte (ou uma so, sem divisao).
+    await supabase.from('transactions').delete().eq('invoice_item_id', item.id);
+    const base = itemToTransaction(item, userId);
+    if (base) {
+      const rows = shares.length > 0
+        ? shares.map((s) => ({ ...base, holder_name: s.person, amount: s.amount, notes: `${MIRROR_NOTE} · dividido` }))
+        : [base];
+      await supabase.from('transactions').insert(rows);
+    }
+
+    setSplits((prev) => {
+      const next = { ...prev };
+      if (shares.length > 0) next[item.id] = shares; else delete next[item.id];
+      return next;
+    });
+    toast({ title: shares.length > 0 ? `Dividido entre ${shares.length} pessoas` : 'Divisão removida' });
+    return true;
+  };
 
   const createInvoice = async () => {
     if (!card) return;
@@ -317,5 +372,5 @@ export function useInvoices(cardId: string) {
     fetchAll();
   };
 
-  return { card, invoices, holders, items, loading, fetchAll, fetchItems, createInvoice, deleteInvoice, addItem, addItemsBatch, updatePreviousBalance, reassignItem };
+  return { card, invoices, holders, items, splits, loading, fetchAll, fetchItems, createInvoice, deleteInvoice, addItem, addItemsBatch, updatePreviousBalance, reassignItem, setItemSplits };
 }
