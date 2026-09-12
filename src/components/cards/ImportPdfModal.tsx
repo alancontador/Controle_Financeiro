@@ -118,7 +118,8 @@ export function ImportPdfModal({ open, onClose, onConfirm, parsed, categoryOptio
   };
 
   const handleConfirm = async () => {
-    const mapped: ImportedInvoiceItem[] = items.map(item => ({ ...item, is_previous_balance: false }));
+    // Tira o campo auxiliar da revisao antes de entregar para gravacao.
+    const mapped: ImportedInvoiceItem[] = items.map(({ remembered_split: _hint, ...item }) => ({ ...item, is_previous_balance: false }));
     setLoading(true);
     try {
       // Espera a gravacao terminar antes de fechar, para o erro (se houver) aparecer com o modal aberto.

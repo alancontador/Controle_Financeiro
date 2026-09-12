@@ -211,12 +211,21 @@ export function useInvoiceImport() {
             assigned = remembered.assigned_to;
           }
         }
+        // So colunas reais de invoice_items: a revisao carrega campos auxiliares no item.
         return {
           invoice_id: invoiceId,
-          ...item,
+          holder_name: item.holder_name,
           assigned_to: assigned,
+          card_last_four: item.card_last_four,
           card_kind: item.card_last_four ? kindByNumber.get(item.card_last_four) ?? null : null,
+          transaction_date: item.transaction_date,
+          description: item.description,
+          amount: item.amount,
+          category: item.category,
           category_id: categorization.idByName.get(item.category) ?? null,
+          installment_current: item.installment_current,
+          installment_total: item.installment_total,
+          is_previous_balance: item.is_previous_balance,
         };
       });
       const { data: inserted, error } = await supabase
