@@ -161,7 +161,7 @@ export function ImportPdfModal({ open, onClose, onConfirm, parsed, categoryOptio
     <Dialog open={open} onOpenChange={() => { reset(); onClose(); }}>
       <DialogContent className="sm:max-w-4xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Importar Fatura PDF{conferencia ? ` (${conferencia.bank})` : ` (${SUPPORTED_BANKS.join(' ou ')})`}</DialogTitle>
+          <DialogTitle>Importar Fatura PDF{conferencia ? ` (${conferencia.bank})` : ` (${SUPPORTED_BANKS.slice(0, -1).join(', ')} ou ${SUPPORTED_BANKS[SUPPORTED_BANKS.length - 1]})`}</DialogTitle>
         </DialogHeader>
 
         {!parsed && (

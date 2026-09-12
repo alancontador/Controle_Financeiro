@@ -17,7 +17,7 @@ export interface PdfLine {
 }
 
 /** Bancos cujas faturas em PDF o sistema sabe ler. */
-export type InvoiceBank = 'Bradesco' | 'Nubank';
+export type InvoiceBank = 'Bradesco' | 'Nubank' | 'Itaú';
 
 /** Um lancamento lido da fatura, no formato comum a todos os bancos. */
 export interface ParsedItem {
