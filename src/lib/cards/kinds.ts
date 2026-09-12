@@ -1,6 +1,6 @@
 /**
- * Tipo de cada cartao que aparece numa fatura. A fatura do Bradesco nao
- * rotula: traz so nome do titular e numero mascarado por bloco. Regras:
+ * Tipo de cada cartao que aparece numa fatura. As faturas (Bradesco, Nubank)
+ * nao rotulam: trazem so nome do titular e numero mascarado por bloco. Regras:
  * - o numero do cabecalho ("Numero do Cartao") e o principal;
  * - outro numero do MESMO titular e um cartao virtual/temporario;
  * - numero em nome de OUTRA pessoa e um cartao adicional.

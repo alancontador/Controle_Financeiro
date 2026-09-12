@@ -253,7 +253,7 @@ const CardInvoices = () => {
                             <FileSpreadsheet className="w-4 h-4 mr-1" /> Importar Excel/CSV
                           </Button>
                           <Button size="sm" variant="outline" onClick={openPdfModal}>
-                            <Upload className="w-4 h-4 mr-1" /> Importar PDF Bradesco
+                            <Upload className="w-4 h-4 mr-1" /> Importar PDF da fatura
                           </Button>
                         </>
                       )}

@@ -6,22 +6,23 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Upload, AlertCircle, CheckCircle2, XCircle } from 'lucide-react';
 import { extractPdfLines } from '@/lib/pdf/extractText';
-import { parseBradescoFatura, type BradescoItem, type BradescoParseResult } from '@/lib/pdf/bradesco';
+import { parseInvoice, SUPPORTED_BANKS } from '@/lib/pdf/invoice';
+import type { ParsedItem, ParseResult } from '@/lib/pdf/types';
 import { CARD_CATEGORIES } from '@/lib/pdf/autoCategory';
 import { CARD_KINDS, CARD_KIND_LABEL, classifyInvoiceCards, type CardKind, type InvoiceCard } from '@/lib/cards/kinds';
 import { resolveAttribution, type AttributionMemory } from '@/lib/cards/attribution';
 
 /** Item no formato que a tabela invoice_items espera. */
-export type ImportedInvoiceItem = BradescoItem & { is_previous_balance: boolean; assigned_to?: string | null };
+export type ImportedInvoiceItem = ParsedItem & { is_previous_balance: boolean; assigned_to?: string | null };
 
-type ReviewItem = BradescoItem & { assigned_to?: string | null; remembered_split?: string };
+type ReviewItem = ParsedItem & { assigned_to?: string | null; remembered_split?: string };
 
 interface Props {
   open: boolean;
   onClose: () => void;
   onConfirm: (items: ImportedInvoiceItem[], previousBalance: number, cards: InvoiceCard[]) => void | Promise<void>;
   /** Resultado ja lido (fluxo da aba Cartoes): pula a escolha do arquivo e vai direto para a revisao. */
-  parsed?: BradescoParseResult | null;
+  parsed?: ParseResult | null;
   /** Lista de categorias oferecida na revisao. Padrao: a lista fixa do cartao. */
   categoryOptions?: string[];
   /** Sugestao de categoria por descricao (memoria + regras). Se ausente, fica a do parser. */
@@ -35,7 +36,7 @@ interface Props {
   thirdParties?: ReadonlySet<string>;
 }
 
-type Conferencia = Pick<BradescoParseResult, 'totalFatura' | 'parsedTotal' | 'cardTotals' | 'dueDate'>;
+type Conferencia = Pick<ParseResult, 'totalFatura' | 'parsedTotal' | 'cardTotals' | 'dueDate'> & { bank: string };
 
 const sameCents = (a: number, b: number) => Math.abs(a - b) < 0.005;
 
@@ -56,7 +57,7 @@ export function ImportPdfModal({ open, onClose, onConfirm, parsed, categoryOptio
     setError('');
   };
 
-  const applyResult = (result: BradescoParseResult) => {
+  const applyResult = (result: ParseResult) => {
     setItems(result.items.map((i) => {
       const remembered = attribution ? resolveAttribution(i, attribution) : null;
       return {
@@ -69,7 +70,7 @@ export function ImportPdfModal({ open, onClose, onConfirm, parsed, categoryOptio
     }));
     setCards(classifyInvoiceCards(result.header, knownKinds));
     setPreviousBalance(result.previousBalance);
-    setConferencia(result);
+    setConferencia({ ...result, bank: result.header.bank });
   };
 
   useEffect(() => {
@@ -86,7 +87,7 @@ export function ImportPdfModal({ open, onClose, onConfirm, parsed, categoryOptio
 
     try {
       const lines = await extractPdfLines(await file.arrayBuffer());
-      const result = parseBradescoFatura(lines);
+      const result = parseInvoice(lines);
 
       if (result.error) {
         setError(result.error);
@@ -160,7 +161,7 @@ export function ImportPdfModal({ open, onClose, onConfirm, parsed, categoryOptio
     <Dialog open={open} onOpenChange={() => { reset(); onClose(); }}>
       <DialogContent className="sm:max-w-4xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Importar Fatura PDF (Bradesco)</DialogTitle>
+          <DialogTitle>Importar Fatura PDF{conferencia ? ` (${conferencia.bank})` : ` (${SUPPORTED_BANKS.join(' ou ')})`}</DialogTitle>
         </DialogHeader>
 
         {!parsed && (
@@ -197,7 +198,7 @@ export function ImportPdfModal({ open, onClose, onConfirm, parsed, categoryOptio
                       {sameCents(c.declared, c.parsed)
                         ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                         : <XCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />}
-                      {c.holder} •••• {c.lastFour}: lido {fmt(c.parsed)} · fatura {fmt(c.declared)}
+                      {c.holder}{c.lastFour ? ` •••• ${c.lastFour}` : ''}: lido {fmt(c.parsed)} · fatura {fmt(c.declared)}
                     </li>
                   ))}
                   {conferencia.totalFatura !== undefined && (

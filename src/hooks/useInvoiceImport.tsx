@@ -8,14 +8,14 @@ import {
   DEFAULT_CATEGORY_STYLE, FALLBACK_CATEGORY, RULE_CATEGORIES, normalizeDescription, suggestCategory,
   type CategoryMemory,
 } from '@/lib/pdf/categorize';
-import type { BradescoHeader, BradescoItem } from '@/lib/pdf/bradesco';
+import type { ParsedHeader, ParsedItem } from '@/lib/pdf/types';
 import type { CardKind, InvoiceCard } from '@/lib/cards/kinds';
 import { attributionKeys, resolveAttribution, sharesFromFractions, type Attribution, type AttributionMemory } from '@/lib/cards/attribution';
 import { MIRROR_NOTE } from '@/lib/cards/mirror';
 import { loadThirdPartySet } from '@/hooks/usePeople';
 import type { CreditCard, Invoice } from '@/hooks/useCreditCards';
 
-export interface ImportableItem extends BradescoItem {
+export interface ImportableItem extends ParsedItem {
   is_previous_balance: boolean;
   /** Realocacao feita na revisao: responsavel diferente do titular do cartao. */
   assigned_to?: string | null;
@@ -30,7 +30,7 @@ export interface Categorization {
 
 export interface ImportInput {
   cardId: string;
-  header: BradescoHeader;
+  header: ParsedHeader;
   items: ImportableItem[];
   previousBalance: number;
   /** Data de fechamento da fatura (define o periodo). */

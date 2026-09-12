@@ -8,7 +8,8 @@ import {
 import { Upload, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { extractPdfLines } from '@/lib/pdf/extractText';
-import { parseBradescoFatura, type BradescoParseResult } from '@/lib/pdf/bradesco';
+import { parseInvoice } from '@/lib/pdf/invoice';
+import type { ParseResult } from '@/lib/pdf/types';
 import { CardModal, type CardFormData } from '@/components/cards/CardModal';
 import { ImportPdfModal, type ImportedInvoiceItem } from '@/components/cards/ImportPdfModal';
 import { useInvoiceImport, type Categorization } from '@/hooks/useInvoiceImport';
@@ -26,7 +27,7 @@ interface Props {
 const titleCase = (s: string) => s.toLowerCase().replace(/(^|\s)\S/g, (c) => c.toUpperCase());
 
 /** Sugestao de cadastro a partir do cabecalho da fatura. */
-function cardFromHeader(parsed: BradescoParseResult): Partial<CardFormData> {
+function cardFromHeader(parsed: ParseResult): Partial<CardFormData> {
   const { header, dueDate } = parsed;
   const brandLabel = header.brandLabel ? titleCase(header.brandLabel) : header.brand;
   return {
@@ -52,7 +53,7 @@ export function ImportInvoiceFlow({ cards, createCard, onImported }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [busy, setBusy] = useState(false);
-  const [parsed, setParsed] = useState<BradescoParseResult | null>(null);
+  const [parsed, setParsed] = useState<ParseResult | null>(null);
   const [categorization, setCategorization] = useState<Categorization | null>(null);
   const [knownKinds, setKnownKinds] = useState<Map<string, CardKind>>(new Map());
   const [attribution, setAttribution] = useState<AttributionMemory>(new Map());
@@ -84,7 +85,7 @@ export function ImportInvoiceFlow({ cards, createCard, onImported }: Props) {
     if (!file) return;
     setBusy(true);
     try {
-      const result = parseBradescoFatura(await extractPdfLines(await file.arrayBuffer()));
+      const result = parseInvoice(await extractPdfLines(await file.arrayBuffer()));
       if (result.error) {
         toast({ title: 'Não foi possível ler a fatura', description: result.error, variant: 'destructive' });
         return;
@@ -130,7 +131,7 @@ export function ImportInvoiceFlow({ cards, createCard, onImported }: Props) {
   };
 
   /** Com o cartao resolvido: checa duplicidade e abre a revisao. */
-  const continueWithCard = async (id: string, result: BradescoParseResult) => {
+  const continueWithCard = async (id: string, result: ParseResult) => {
     setCardId(id);
     setKnownKinds(await loadKnownKinds(id));
     const existing = await findExistingInvoice(id, result.header.closingDate!);

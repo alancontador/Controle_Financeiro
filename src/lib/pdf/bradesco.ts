@@ -1,6 +1,6 @@
 import { autoCategory } from './autoCategory';
 import { addMonths } from '@/lib/dates';
-import type { PdfLine, PdfTextItem } from './types';
+import type { CardTotal, ParsedHeader, ParsedItem, ParseResult, PdfLine, PdfTextItem } from './types';
 
 /**
  * Parser da "Fatura Mensal" do Bradesco Cartoes (PDF baixado do app/site).
@@ -12,62 +12,11 @@ import type { PdfLine, PdfTextItem } from './types';
  * com o texto: tudo que esta a direita da coluna de valor R$ e descartado.
  */
 
-export interface BradescoItem {
-  /** Pessoa (titular ou adicional) do bloco em que o lancamento aparece; "Pagamentos" fora de bloco. */
-  holder_name: string;
-  /** Final do cartao do bloco (principal, virtual ou adicional); null fora de bloco. */
-  card_last_four: string | null;
-  /** Data ISO (aaaa-mm-dd). */
-  transaction_date: string;
-  description: string;
-  /** Negativo para creditos (pagamentos, estornos). */
-  amount: number;
-  category: string;
-  installment_current: number | null;
-  installment_total: number | null;
-}
-
-export interface CardTotal {
-  holder: string;
-  lastFour: string;
-  /** Subtotal que a fatura declara na linha "Total para <titular>". */
-  declared: number;
-  /** Soma dos lancamentos que o parser encontrou nesse bloco. */
-  parsed: number;
-}
-
-/** Dados do cartao lidos do cabecalho, para pre-preencher o cadastro. */
-export interface BradescoHeader {
-  bank: 'Bradesco';
-  /** Bandeira normalizada para o cadastro (Elo, Visa, Mastercard, Amex, Hipercard, Outro). */
-  brand: string;
-  /** Texto como esta na fatura, ex. "ELO GRAFITE". */
-  brandLabel?: string;
-  /** Final do cartao principal ("Numero do Cartao"). */
-  lastFour?: string;
-  /** Limite de compras. */
-  limit?: number;
-  /** Data de fechamento desta fatura, ISO. */
-  closingDate?: string;
-  /** Nomes das pessoas, sem repeticao, na ordem dos blocos. */
-  holders: string[];
-  /** Cada bloco de cartao da fatura: pessoa + final do numero, na ordem. */
-  cards: { holder: string; lastFour: string }[];
-}
-
-export interface BradescoParseResult {
-  header: BradescoHeader;
-  items: BradescoItem[];
-  previousBalance: number;
-  /** "Total da fatura em real" (ou o total do cabecalho, se aquele faltar). */
-  totalFatura?: number;
-  /** Vencimento em ISO. Ancora o ano dos lancamentos, que na fatura so tem dia/mes. */
-  dueDate?: string;
-  cardTotals: CardTotal[];
-  /** Soma dos lancamentos dentro dos blocos de cartao: e o que a fatura chama de total. */
-  parsedTotal: number;
-  error?: string;
-}
+/** Nomes antigos, mantidos para quem importa direto deste modulo. */
+export type BradescoItem = ParsedItem;
+export type BradescoHeader = ParsedHeader;
+export type BradescoParseResult = ParseResult;
+export type { CardTotal };
 
 /** Colunas da fatura, em pontos. Medidas numa fatura real; ver comentarios no teste. */
 const COL = {
@@ -114,8 +63,8 @@ function leftItems(line: PdfLine): PdfTextItem[] {
 }
 const joinText = (items: PdfTextItem[]) => items.map((i) => i.text.trim()).join(' ');
 
-export function parseBradescoFatura(lines: PdfLine[], today: Date = new Date()): BradescoParseResult {
-  const items: BradescoItem[] = [];
+export function parseBradescoFatura(lines: PdfLine[], today: Date = new Date()): ParseResult {
+  const items: ParsedItem[] = [];
   const cardTotals: CardTotal[] = [];
   let previousBalance = 0;
   let totalFatura: number | undefined;
@@ -128,7 +77,7 @@ export function parseBradescoFatura(lines: PdfLine[], today: Date = new Date()):
   let cardSum = 0;
   let parsedTotal = 0;
 
-  const header: BradescoHeader = { bank: 'Bradesco', brand: 'Outro', holders: [], cards: [] };
+  const header: ParsedHeader = { bank: 'Bradesco', brand: 'Outro', holders: [], cards: [] };
   let nextClosing: string | undefined;
 
   // O ano so pode ser resolvido depois de ler o vencimento (pagina 1), mas os
