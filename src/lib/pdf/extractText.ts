@@ -16,7 +16,7 @@ pdfjs.GlobalWorkerOptions.workerSrc = `${workerUrl}?v=${pdfjs.version}`;
  * caso de praticamente todo PDF gerado hoje - inclusive a fatura do Bradesco.
  */
 export async function extractPdfLines(data: ArrayBuffer): Promise<PdfLine[]> {
-  const task = pdfjs.getDocument({ data: new Uint8Array(data) });
+  const task = pdfjs.getDocument({ data: trimToPdfHeader(new Uint8Array(data)) });
   const doc = await task.promise;
   try {
     const lines: PdfLine[] = [];
@@ -36,4 +36,19 @@ export async function extractPdfLines(data: ArrayBuffer): Promise<PdfLine[]> {
     // Libera o worker e a memoria do documento; e a loading task que tem destroy().
     await task.destroy();
   }
+}
+
+/**
+ * Alguns apps gravam lixo antes do cabecalho do PDF (a fatura do Inter veio
+ * com ~400 KB de bytes zero na frente), e o pdf.js so tolera lixo curto
+ * ("Invalid Root reference"). Corta tudo que vier antes de "%PDF".
+ */
+export function trimToPdfHeader(bytes: Uint8Array): Uint8Array {
+  const header = [0x25, 0x50, 0x44, 0x46]; // %PDF
+  for (let i = 0; i + header.length <= bytes.length; i++) {
+    if (bytes[i] === header[0] && bytes[i + 1] === header[1] && bytes[i + 2] === header[2] && bytes[i + 3] === header[3]) {
+      return i === 0 ? bytes : bytes.subarray(i);
+    }
+  }
+  return bytes;
 }

@@ -1,9 +1,10 @@
 import { parseBradescoFatura } from './bradesco';
 import { parseNubankFatura } from './nubank';
 import { parseItauFatura } from './itau';
+import { parseInterFatura } from './inter';
 import type { InvoiceBank, ParseResult, PdfLine } from './types';
 
-export const SUPPORTED_BANKS: InvoiceBank[] = ['Bradesco', 'Nubank', 'Itaú'];
+export const SUPPORTED_BANKS: InvoiceBank[] = ['Bradesco', 'Nubank', 'Itaú', 'Inter'];
 
 /**
  * Descobre de qual banco e a fatura pela estrutura do PDF, nao por uma palavra
@@ -22,6 +23,9 @@ export function detectBank(lines: PdfLine[]): InvoiceBank | null {
   if (has(/ITAU UNIBANCO HOLDING|Ita[uú] Cart[õo]es|itau\.com\.br/i) || has(/^Cart[ãa]o\s+\d{4}\.X{4}\.X{4}\.\d{4}/i)) {
     return 'Itaú';
   }
+  if (has(/BANCO INTER S\/A|bancointer\.com\.br|inter\.co\//i) || has(/^\d{4}\*{4}\d{4}\s+\d{2}\/\d{2}\/\d{4}/)) {
+    return 'Inter';
+  }
   return null;
 }
 
@@ -31,6 +35,7 @@ export function parseInvoice(lines: PdfLine[], today: Date = new Date()): ParseR
   if (bank === 'Nubank') return parseNubankFatura(lines, today);
   if (bank === 'Bradesco') return parseBradescoFatura(lines, today);
   if (bank === 'Itaú') return parseItauFatura(lines, today);
+  if (bank === 'Inter') return parseInterFatura(lines, today);
   return {
     header: { bank: 'Bradesco', brand: 'Outro', holders: [], cards: [] },
     items: [],
