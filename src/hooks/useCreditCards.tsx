@@ -43,6 +43,8 @@ export interface InvoiceItem {
   id: string;
   invoice_id: string;
   holder_name: string;
+  /** Responsavel pela despesa quando realocada para outra pessoa; null = titular do cartao. */
+  assigned_to: string | null;
   card_last_four: string | null;
   card_kind: 'principal' | 'adicional' | 'virtual' | null;
   transaction_date: string;
@@ -260,6 +262,24 @@ export function useInvoices(cardId: string) {
     return true;
   };
 
+  /**
+   * Realoca uma compra para outra pessoa (ou de volta ao titular com null).
+   * A compra fica no mesmo cartao; muda so o responsavel, na fatura e na
+   * despesa espelhada, para a analise por pessoa refletir quem gastou de fato.
+   */
+  const reassignItem = async (item: InvoiceItem, person: string | null) => {
+    const assigned = person && person !== item.holder_name ? person : null;
+    const { error } = await supabase.from('invoice_items').update({ assigned_to: assigned }).eq('id', item.id);
+    if (error) {
+      toast({ title: 'Erro ao realocar', description: error.message, variant: 'destructive' });
+      return false;
+    }
+    await supabase.from('transactions').update({ holder_name: assigned ?? item.holder_name }).eq('invoice_item_id', item.id);
+    setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, assigned_to: assigned } : i)));
+    toast({ title: assigned ? `Realocado para ${assigned}` : `De volta para ${item.holder_name}` });
+    return true;
+  };
+
   const deleteInvoice = async (invoiceId: string) => {
     // invoice_items (e, depois, as transacoes espelhadas) caem por CASCADE.
     const { error } = await supabase.from('invoices').delete().eq('id', invoiceId);
@@ -297,5 +317,5 @@ export function useInvoices(cardId: string) {
     fetchAll();
   };
 
-  return { card, invoices, holders, items, loading, fetchAll, fetchItems, createInvoice, deleteInvoice, addItem, addItemsBatch, updatePreviousBalance };
+  return { card, invoices, holders, items, loading, fetchAll, fetchItems, createInvoice, deleteInvoice, addItem, addItemsBatch, updatePreviousBalance, reassignItem };
 }

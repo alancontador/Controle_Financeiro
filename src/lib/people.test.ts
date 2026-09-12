@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { COMMON_PERSON, personOf, summarizeByPerson, type PersonTx } from './people';
+import { COMMON_PERSON, effectivePerson, personOf, summarizeByPerson, type PersonTx } from './people';
 
 const tx = (over: Partial<PersonTx>): PersonTx => ({
   holder_name: 'ANA',
@@ -15,6 +15,15 @@ describe('personOf', () => {
     expect(personOf({ holder_name: null })).toBe(COMMON_PERSON);
     expect(personOf({ holder_name: '  ' })).toBe(COMMON_PERSON);
     expect(personOf({ holder_name: 'ANA' })).toBe('ANA');
+  });
+});
+
+describe('effectivePerson', () => {
+  it('realocacao vence o titular do cartao; sem realocacao fica o titular', () => {
+    expect(effectivePerson({ holder_name: 'FERNANDA', assigned_to: 'JOSE' })).toBe('JOSE');
+    expect(effectivePerson({ holder_name: 'FERNANDA', assigned_to: null })).toBe('FERNANDA');
+    expect(effectivePerson({ holder_name: 'FERNANDA', assigned_to: '  ' })).toBe('FERNANDA');
+    expect(effectivePerson({ holder_name: null })).toBe(COMMON_PERSON);
   });
 });
 

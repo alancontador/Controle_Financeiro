@@ -12,6 +12,16 @@ export function personOf(t: { holder_name: string | null | undefined }): string 
   return name ? name : COMMON_PERSON;
 }
 
+/**
+ * Pessoa responsavel por um lancamento de fatura: a realocacao (assigned_to)
+ * vence o titular do cartao (holder_name). A compra continua no cartao; so a
+ * atribuicao da despesa muda.
+ */
+export function effectivePerson(item: { holder_name: string | null | undefined; assigned_to?: string | null }): string {
+  const reassigned = item.assigned_to?.trim();
+  return reassigned ? reassigned : personOf(item);
+}
+
 export interface PersonTx {
   holder_name: string | null;
   amount: number;

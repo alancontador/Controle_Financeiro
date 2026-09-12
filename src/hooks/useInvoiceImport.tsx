@@ -14,6 +14,8 @@ import type { CreditCard, Invoice } from '@/hooks/useCreditCards';
 
 export interface ImportableItem extends BradescoItem {
   is_previous_balance: boolean;
+  /** Realocacao feita na revisao: responsavel diferente do titular do cartao. */
+  assigned_to?: string | null;
 }
 
 /** O que a revisao precisa para categorizar: opcoes, sugestao e o mapa nome -> id. */
@@ -183,7 +185,7 @@ export function useInvoiceImport() {
       const { data: inserted, error } = await supabase
         .from('invoice_items')
         .insert(rows)
-        .select('id, holder_name, card_last_four, description, amount, transaction_date, category_id');
+        .select('id, holder_name, assigned_to, card_last_four, description, amount, transaction_date, category_id');
       if (error) {
         toast({ title: 'Erro ao gravar os lançamentos', description: error.message, variant: 'destructive' });
         return false;

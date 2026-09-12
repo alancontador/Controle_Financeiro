@@ -391,6 +391,7 @@ export type Database = {
           category_id: string | null
           card_last_four: string | null
           card_kind: string | null
+          assigned_to: string | null
         }
         Insert: {
           amount: number
@@ -407,6 +408,7 @@ export type Database = {
           category_id?: string | null
           card_last_four?: string | null
           card_kind?: string | null
+          assigned_to?: string | null
         }
         Update: {
           amount?: number
@@ -423,6 +425,7 @@ export type Database = {
           category_id?: string | null
           card_last_four?: string | null
           card_kind?: string | null
+          assigned_to?: string | null
         }
         Relationships: [
           {

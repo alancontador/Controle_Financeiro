@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { personOf } from '@/lib/people';
+import { effectivePerson } from '@/lib/people';
 import type { CardKind } from '@/lib/cards/kinds';
 
 export interface PersonCardSpend {
   lastFour: string;
   kind: CardKind | null;
+  /** Titular do cartao quando a compra foi realocada para outra pessoa. */
+  cardHolder?: string;
   /** Gasto na fatura mais recente (compras menos estornos; pagamentos fora). */
   total: number;
   itemCount: number;
@@ -57,7 +59,7 @@ export function useCardPeople(): CardPeopleData {
 
     const invoiceIds = [...latest.values()].map((i) => i.id);
     const items = invoiceIds.length
-      ? (await supabase.from('invoice_items').select('invoice_id, holder_name, card_last_four, card_kind, description, amount').in('invoice_id', invoiceIds)).data ?? []
+      ? (await supabase.from('invoice_items').select('invoice_id, holder_name, assigned_to, card_last_four, card_kind, description, amount').in('invoice_id', invoiceIds)).data ?? []
       : [];
 
     const kindByCardNumber = new Map<string, CardKind | null>();
@@ -71,13 +73,19 @@ export function useCardPeople(): CardPeopleData {
       for (const it of items) {
         if (it.invoice_id !== inv.id) continue;
         if (RE_PAYMENT.test(it.description)) continue;
-        const person = personOf(it);
+        const person = effectivePerson(it);
         const p = people.get(person) ?? { person, total: 0, share: 0, cards: [] };
         p.total += Number(it.amount);
         const lf = it.card_last_four ?? '';
         let c = p.cards.find((x) => x.lastFour === lf);
         if (!c) {
-          c = { lastFour: lf, kind: (it.card_kind as CardKind) ?? kindByCardNumber.get(`${cardId}:${lf}`) ?? null, total: 0, itemCount: 0 };
+          c = {
+            lastFour: lf,
+            kind: (it.card_kind as CardKind) ?? kindByCardNumber.get(`${cardId}:${lf}`) ?? null,
+            cardHolder: it.holder_name && it.holder_name !== person ? it.holder_name : undefined,
+            total: 0,
+            itemCount: 0,
+          };
           p.cards.push(c);
         }
         c.total += Number(it.amount);

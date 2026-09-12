@@ -41,6 +41,7 @@ export function CardPeopleBreakdown({ people, invoiceLabel }: Props) {
                 <span className="flex items-center gap-2 text-muted-foreground">
                   <CreditCardIcon className="w-3.5 h-3.5" />
                   {c.lastFour ? `${c.kind ? CARD_KIND_LABEL[c.kind] : 'Cartão'} •••• ${c.lastFour}` : 'Sem cartão'}
+                  {c.cardHolder && <span className="text-xs italic">(cartão de {c.cardHolder})</span>}
                   <span className="text-xs">· {c.itemCount} lançamento{c.itemCount === 1 ? '' : 's'}</span>
                 </span>
                 <span className={c.total < 0 ? 'text-emerald-600' : ''}>{fmt(c.total)}</span>

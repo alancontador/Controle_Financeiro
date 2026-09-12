@@ -50,6 +50,12 @@ describe('itemToTransaction', () => {
     expect(t.amount).toBe(-59);
   });
 
+  it('compra realocada vai para o responsavel, mantendo o cartao de origem', () => {
+    const t = itemToTransaction({ ...base, holder_name: 'FERNANDA', card_last_four: '4760', assigned_to: 'JOSE' }, 'user-1')!;
+    expect(t.holder_name).toBe('JOSE');
+    expect(t.card_last_four).toBe('4760');
+  });
+
   it('sem categoria resolvida, grava sem category_id (aparece como sem categoria)', () => {
     expect(itemToTransaction({ ...base, category_id: null }, 'user-1')!.category_id).toBeNull();
   });

@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useAuth } from '@/hooks/useAuth';
 import { useCreditCards, useInvoices } from '@/hooks/useCreditCards';
 import { useInvoiceImport, type Categorization, type ImportableItem } from '@/hooks/useInvoiceImport';
+import { usePeople } from '@/hooks/usePeople';
 import { UpcomingInvoices } from '@/components/cards/UpcomingInvoices';
 import { CARD_KIND_LABEL, type CardKind, type InvoiceCard } from '@/lib/cards/kinds';
 import { AddItemModal } from '@/components/cards/AddItemModal';
@@ -28,8 +29,9 @@ const CardInvoices = () => {
   const navigate = useNavigate();
   const {
     card, invoices, holders, items, loading,
-    fetchAll, fetchItems, createInvoice, deleteInvoice, addItem, addItemsBatch, updatePreviousBalance,
+    fetchAll, fetchItems, createInvoice, deleteInvoice, addItem, addItemsBatch, updatePreviousBalance, reassignItem,
   } = useInvoices(cardId || '');
+  const { people: householdPeople } = usePeople();
   const { usage: usageByCard } = useCreditCards();
 
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string>('');
@@ -290,6 +292,7 @@ const CardInvoices = () => {
                                         <TableHead>Data</TableHead>
                                         <TableHead>Descrição</TableHead>
                                         <TableHead>Categoria</TableHead>
+                                        <TableHead>Responsável</TableHead>
                                         <TableHead>Parcela</TableHead>
                                         <TableHead className="text-right">Valor</TableHead>
                                       </TableRow>
@@ -300,6 +303,25 @@ const CardInvoices = () => {
                                           <TableCell className="whitespace-nowrap">{fmtDateShort(item.transaction_date)}</TableCell>
                                           <TableCell>{item.description}</TableCell>
                                           <TableCell className="text-muted-foreground">{item.category}</TableCell>
+                                          <TableCell>
+                                            {item.holder_name === 'Pagamentos' ? (
+                                              <span className="text-muted-foreground">-</span>
+                                            ) : (
+                                              <Select
+                                                value={item.assigned_to || item.holder_name}
+                                                onValueChange={(v) => reassignItem(item, v === item.holder_name ? null : v)}
+                                              >
+                                                <SelectTrigger className={`h-8 text-xs w-[190px] ${item.assigned_to ? 'border-primary/60 text-primary' : ''}`} title={item.assigned_to ? `Compra no cartão de ${item.holder_name}, realocada` : 'Quem é responsável por esta despesa'}>
+                                                  <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                  {[...new Set([item.holder_name, ...householdPeople])].map((p) => (
+                                                    <SelectItem key={p} value={p}>{p}{p === item.holder_name ? ' (titular do cartão)' : ''}</SelectItem>
+                                                  ))}
+                                                </SelectContent>
+                                              </Select>
+                                            )}
+                                          </TableCell>
                                           <TableCell>
                                             {item.installment_current && item.installment_total
                                               ? `${item.installment_current}/${item.installment_total}`
@@ -383,6 +405,7 @@ const CardInvoices = () => {
           categoryOptions={categorization?.options}
           suggest={categorization?.suggest}
           knownKinds={knownKinds}
+          people={householdPeople}
           onClose={() => setPdfModalOpen(false)}
           onConfirm={handlePdfImport}
         />

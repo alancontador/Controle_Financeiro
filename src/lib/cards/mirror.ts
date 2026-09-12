@@ -8,9 +8,13 @@
  * - estorno vira despesa negativa, reduzindo o gasto da categoria.
  */
 
+import { effectivePerson } from '@/lib/people';
+
 export interface MirrorableItem {
   id: string;
   holder_name: string;
+  /** Responsavel pela despesa quando diferente do titular do cartao. */
+  assigned_to?: string | null;
   card_last_four: string | null;
   description: string;
   amount: number;
@@ -44,7 +48,7 @@ export function itemToTransaction(item: MirrorableItem, userId: string): Mirrore
   if (isPaymentLine(item.description)) return null;
   return {
     user_id: userId,
-    holder_name: item.holder_name,
+    holder_name: effectivePerson(item),
     card_last_four: item.card_last_four,
     description: item.description,
     amount: item.amount,

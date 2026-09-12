@@ -12,6 +12,7 @@ import { parseBradescoFatura, type BradescoParseResult } from '@/lib/pdf/bradesc
 import { CardModal, type CardFormData } from '@/components/cards/CardModal';
 import { ImportPdfModal, type ImportedInvoiceItem } from '@/components/cards/ImportPdfModal';
 import { useInvoiceImport, type Categorization } from '@/hooks/useInvoiceImport';
+import { usePeople } from '@/hooks/usePeople';
 import type { CardKind, InvoiceCard } from '@/lib/cards/kinds';
 import type { CreditCard, Invoice } from '@/hooks/useCreditCards';
 
@@ -46,6 +47,7 @@ function cardFromHeader(parsed: BradescoParseResult): Partial<CardFormData> {
 export function ImportInvoiceFlow({ cards, createCard, onImported }: Props) {
   const { toast } = useToast();
   const { findCardByLastFour, findExistingInvoice, importInvoice, loadCategorization, loadKnownKinds } = useInvoiceImport();
+  const { people } = usePeople();
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [busy, setBusy] = useState(false);
@@ -194,6 +196,7 @@ export function ImportInvoiceFlow({ cards, createCard, onImported }: Props) {
         categoryOptions={categorization?.options}
         suggest={categorization?.suggest}
         knownKinds={knownKinds}
+        people={people}
         onClose={resetAll}
         onConfirm={handleConfirm}
       />

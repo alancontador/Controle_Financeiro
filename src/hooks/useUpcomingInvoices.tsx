@@ -36,7 +36,7 @@ export function useUpcomingInvoices(cardId?: string, months = 6): UpcomingInvoic
 
     let query = supabase
       .from('invoice_items')
-      .select('holder_name, description, amount, installment_current, installment_total, invoice:invoices!inner(card_id, period_end)');
+      .select('holder_name, assigned_to, description, amount, installment_current, installment_total, invoice:invoices!inner(card_id, period_end)');
     if (cardId) query = query.eq('invoice.card_id', cardId);
 
     const threeMonthsAgo = addMonths(toIsoDate(new Date()), -3);
@@ -49,7 +49,7 @@ export function useUpcomingInvoices(cardId?: string, months = 6): UpcomingInvoic
       const inv = row.invoice as unknown as { card_id: string; period_end: string };
       return {
         cardId: inv.card_id,
-        holder: row.holder_name,
+        holder: row.assigned_to?.trim() || row.holder_name,
         invoiceMonth: monthKey(inv.period_end),
         description: row.description,
         amount: Number(row.amount),

@@ -11,7 +11,9 @@ import { CARD_CATEGORIES } from '@/lib/pdf/autoCategory';
 import { CARD_KINDS, CARD_KIND_LABEL, classifyInvoiceCards, type CardKind, type InvoiceCard } from '@/lib/cards/kinds';
 
 /** Item no formato que a tabela invoice_items espera. */
-export type ImportedInvoiceItem = BradescoItem & { is_previous_balance: boolean };
+export type ImportedInvoiceItem = BradescoItem & { is_previous_balance: boolean; assigned_to?: string | null };
+
+type ReviewItem = BradescoItem & { assigned_to?: string | null };
 
 interface Props {
   open: boolean;
@@ -25,14 +27,16 @@ interface Props {
   suggest?: (description: string) => string;
   /** Tipos de cartao ja escolhidos antes, por numero (lembrados em card_holders). */
   knownKinds?: ReadonlyMap<string, CardKind>;
+  /** Pessoas da casa, para realocar uma compra a outro responsavel ja na revisao. */
+  people?: string[];
 }
 
 type Conferencia = Pick<BradescoParseResult, 'totalFatura' | 'parsedTotal' | 'cardTotals' | 'dueDate'>;
 
 const sameCents = (a: number, b: number) => Math.abs(a - b) < 0.005;
 
-export function ImportPdfModal({ open, onClose, onConfirm, parsed, categoryOptions, suggest, knownKinds }: Props) {
-  const [items, setItems] = useState<BradescoItem[]>([]);
+export function ImportPdfModal({ open, onClose, onConfirm, parsed, categoryOptions, suggest, knownKinds, people = [] }: Props) {
+  const [items, setItems] = useState<ReviewItem[]>([]);
   const [cards, setCards] = useState<InvoiceCard[]>([]);
   const [previousBalance, setPreviousBalance] = useState(0);
   const [conferencia, setConferencia] = useState<Conferencia | null>(null);
@@ -93,6 +97,10 @@ export function ImportPdfModal({ open, onClose, onConfirm, parsed, categoryOptio
     setItems(prev => prev.map((item, i) => i === index ? { ...item, description } : item));
   };
 
+  const updateItemPerson = (index: number, person: string) => {
+    setItems(prev => prev.map((item, i) => i === index ? { ...item, assigned_to: person === item.holder_name ? null : person } : item));
+  };
+
   const updateCardKind = (lastFour: string, kind: CardKind) => {
     setCards(prev => prev.map(c => c.lastFour === lastFour ? { ...c, kind } : c));
   };
@@ -119,10 +127,10 @@ export function ImportPdfModal({ open, onClose, onConfirm, parsed, categoryOptio
 
   // Pessoa -> cartao (numero) -> lancamentos, na ordem em que aparecem na fatura.
   // Lancamentos fora de bloco de cartao (pagamentos) ficam na pessoa, sem cartao.
-  const people: { name: string; cards: { lastFour: string; items: BradescoItem[] }[] }[] = [];
+  const groups: { name: string; cards: { lastFour: string; items: ReviewItem[] }[] }[] = [];
   for (const item of items) {
-    let person = people.find(p => p.name === item.holder_name);
-    if (!person) { person = { name: item.holder_name, cards: [] }; people.push(person); }
+    let person = groups.find(p => p.name === item.holder_name);
+    if (!person) { person = { name: item.holder_name, cards: [] }; groups.push(person); }
     const key = item.card_last_four ?? '';
     let card = person.cards.find(c => c.lastFour === key);
     if (!card) { card = { lastFour: key, items: [] }; person.cards.push(card); }
@@ -190,8 +198,9 @@ export function ImportPdfModal({ open, onClose, onConfirm, parsed, categoryOptio
               </div>
             )}
 
-            {people.map(person => {
+            {groups.map(person => {
               const personTotal = person.cards.reduce((s, c) => s + c.items.reduce((t, i) => t + i.amount, 0), 0);
+              const personOptions = [...new Set([person.name, ...people])];
               return (
                 <div key={person.name} className="mb-8">
                   <div className="flex items-center justify-between mb-2">
@@ -226,6 +235,7 @@ export function ImportPdfModal({ open, onClose, onConfirm, parsed, categoryOptio
                               <TableHead>Parcela</TableHead>
                               <TableHead className="text-right">Valor</TableHead>
                               <TableHead>Categoria</TableHead>
+                              {card.lastFour && <TableHead>Responsável</TableHead>}
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -255,6 +265,16 @@ export function ImportPdfModal({ open, onClose, onConfirm, parsed, categoryOptio
                                       </SelectContent>
                                     </Select>
                                   </TableCell>
+                                  {card.lastFour && (
+                                    <TableCell>
+                                      <Select value={item.assigned_to || item.holder_name} onValueChange={v => updateItemPerson(globalIdx, v)}>
+                                        <SelectTrigger className={`h-8 text-xs w-[170px] ${item.assigned_to ? 'border-primary/60 text-primary' : ''}`}><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                          {personOptions.map(p => <SelectItem key={p} value={p}>{p}{p === person.name ? ' (titular)' : ''}</SelectItem>)}
+                                        </SelectContent>
+                                      </Select>
+                                    </TableCell>
+                                  )}
                                 </TableRow>
                               );
                             })}

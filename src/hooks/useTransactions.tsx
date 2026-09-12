@@ -210,6 +210,15 @@ export function useTransactions() {
       prev.map((t) => (t.id === id ? (data as Transaction) : t))
     );
     {
+      // Trocar a pessoa de uma despesa vinda de fatura realoca a compra na fatura tambem.
+      const saved = data as Transaction & { invoice_item_id?: string | null };
+      if ("holder_name" in updates && saved.invoice_item_id) {
+        const { data: item } = await supabase.from("invoice_items").select("holder_name").eq("id", saved.invoice_item_id).maybeSingle();
+        const assigned = saved.holder_name && saved.holder_name !== item?.holder_name ? saved.holder_name : null;
+        await supabase.from("invoice_items").update({ assigned_to: assigned }).eq("id", saved.invoice_item_id);
+      }
+    }
+    {
       // Trocar a categoria de uma despesa ensina o app para a proxima fatura.
       const saved = data as Transaction;
       if (saved.type === "expense" && "category_id" in updates && saved.category?.name) {
