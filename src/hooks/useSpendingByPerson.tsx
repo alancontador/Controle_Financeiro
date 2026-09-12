@@ -5,8 +5,10 @@ import { addMonths, monthKey, toIsoDate } from '@/lib/dates';
 import { summarizeByPerson, type PersonSummary, type PersonTx } from '@/lib/people';
 
 export interface SpendingByPersonData {
-  /** Mes analisado (aaaa-mm). */
+  /** Mes analisado (aaaa-mm): o atual, ou o ultimo com despesas se o atual estiver vazio. */
   month: string;
+  /** true quando `month` nao e o mes corrente (caiu no ultimo mes com dados). */
+  isFallback: boolean;
   summary: PersonSummary[];
   /** Series mensais por pessoa para os ultimos N meses: pessoa -> [{month,total}]. */
   history: Record<string, { month: string; total: number }[]>;
@@ -25,14 +27,14 @@ export function useSpendingByPerson(monthsBack = 6): SpendingByPersonData {
   const [history, setHistory] = useState<Record<string, { month: string; total: number }[]>>({});
   const [months, setMonths] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [month, setMonth] = useState(monthKey(toIsoDate(new Date())));
 
-  const today = toIsoDate(new Date());
-  const month = monthKey(today);
+  const currentMonth = monthKey(toIsoDate(new Date()));
 
   const fetch = useCallback(async () => {
     if (!user) return;
     setLoading(true);
-    const from = addMonths(`${month}-01`, -(monthsBack - 1));
+    const from = addMonths(`${currentMonth}-01`, -(monthsBack - 1));
     const { data } = await supabase
       .from('transactions')
       .select('holder_name, amount, type, date, category:categories(name)')
@@ -48,9 +50,13 @@ export function useSpendingByPerson(monthsBack = 6): SpendingByPersonData {
       category_name: (t.category as unknown as { name: string } | null)?.name ?? null,
     }));
 
-    setSummary(summarizeByPerson(txs, month, { previousMonth: monthKey(addMonths(`${month}-01`, -1)) }));
+    // Mes corrente sem despesas (ex.: fatura do mes ainda nao importada): usa o ultimo com dados.
+    const withData = [...new Set(txs.map((t) => t.date.slice(0, 7)))].sort();
+    const chosen = withData.includes(currentMonth) ? currentMonth : (withData.at(-1) ?? currentMonth);
+    setMonth(chosen);
+    setSummary(summarizeByPerson(txs, chosen, { previousMonth: monthKey(addMonths(`${chosen}-01`, -1)) }));
 
-    const axis = Array.from({ length: monthsBack }, (_, k) => monthKey(addMonths(`${month}-01`, -(monthsBack - 1 - k))));
+    const axis = Array.from({ length: monthsBack }, (_, k) => monthKey(addMonths(`${currentMonth}-01`, -(monthsBack - 1 - k))));
     const hist: Record<string, { month: string; total: number }[]> = {};
     for (const m of axis) {
       for (const p of summarizeByPerson(txs, m)) {
@@ -61,9 +67,9 @@ export function useSpendingByPerson(monthsBack = 6): SpendingByPersonData {
     setMonths(axis);
     setHistory(hist);
     setLoading(false);
-  }, [user, month, monthsBack]);
+  }, [user, currentMonth, monthsBack]);
 
   useEffect(() => { fetch(); }, [fetch]);
 
-  return { month, summary, history, months, loading, refetch: fetch };
+  return { month, isFallback: month !== currentMonth, summary, history, months, loading, refetch: fetch };
 }

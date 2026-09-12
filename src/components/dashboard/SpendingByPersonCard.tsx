@@ -13,7 +13,7 @@ const fmtMonth = (m: string) => MONTHS[Number(m.slice(5, 7)) - 1];
  * mes anterior e as maiores categorias de cada uma - para achar o gargalo.
  */
 export function SpendingByPersonCard() {
-  const { month, summary, loading } = useSpendingByPerson(2);
+  const { month, isFallback, summary, loading } = useSpendingByPerson(2);
   const grand = summary.reduce((s, p) => s + p.total, 0);
 
   return (
@@ -28,7 +28,7 @@ export function SpendingByPersonCard() {
           <h3 className="text-foreground font-semibold text-lg flex items-center gap-2">
             <Users className="w-5 h-5 text-primary" /> Gastos por pessoa
           </h3>
-          <p className="text-muted-foreground text-sm">{fmtMonth(month)} · total {fmt(grand)}</p>
+          <p className="text-muted-foreground text-sm">{fmtMonth(month)}{isFallback ? ' (último mês com dados)' : ''} · total {fmt(grand)}</p>
         </div>
         <Link to="/transactions" className="text-sm text-primary hover:underline flex items-center gap-1">
           Ver transações <ArrowRight className="w-3.5 h-3.5" />
