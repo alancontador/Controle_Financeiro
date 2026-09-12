@@ -361,6 +361,7 @@ export type Database = {
           invoice_id: string
           is_previous_balance: boolean
           transaction_date: string
+          category_id: string | null
         }
         Insert: {
           amount: number
@@ -374,6 +375,7 @@ export type Database = {
           invoice_id: string
           is_previous_balance?: boolean
           transaction_date: string
+          category_id?: string | null
         }
         Update: {
           amount?: number
@@ -387,6 +389,7 @@ export type Database = {
           invoice_id?: string
           is_previous_balance?: boolean
           transaction_date?: string
+          category_id?: string | null
         }
         Relationships: [
           {
@@ -576,6 +579,7 @@ export type Database = {
           type: string
           updated_at: string
           user_id: string
+          invoice_item_id: string | null
         }
         Insert: {
           amount: number
@@ -588,6 +592,7 @@ export type Database = {
           type: string
           updated_at?: string
           user_id: string
+          invoice_item_id?: string | null
         }
         Update: {
           amount?: number
@@ -600,6 +605,7 @@ export type Database = {
           type?: string
           updated_at?: string
           user_id?: string
+          invoice_item_id?: string | null
         }
         Relationships: [
           {

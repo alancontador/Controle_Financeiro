@@ -10,6 +10,7 @@ import { useCreditCards } from '@/hooks/useCreditCards';
 import { CreditCardVisual } from '@/components/cards/CreditCardVisual';
 import { CardModal, type CardFormData } from '@/components/cards/CardModal';
 import { ImportInvoiceFlow } from '@/components/cards/ImportInvoiceFlow';
+import { UpcomingInvoices } from '@/components/cards/UpcomingInvoices';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -93,6 +94,12 @@ const Cards = () => {
                 />
               </motion.div>
             ))}
+          </div>
+        )}
+
+        {cards.length > 0 && (
+          <div className="mt-8">
+            <UpcomingInvoices />
           </div>
         )}
 

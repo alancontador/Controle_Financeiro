@@ -89,6 +89,15 @@ serve(async (req) => {
   }
 
   try {
+    // Projecao das proximas faturas de cartao, calculada no front (mesma regra da tela).
+    let projection: Array<{ month: string; committed: number; estimated: number }> = [];
+    try {
+      const body = await req.json();
+      if (Array.isArray(body?.projection)) projection = body.projection;
+    } catch {
+      // sem body: segue sem projecao
+    }
+
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       throw new Error("No authorization header");
@@ -186,6 +195,11 @@ ${Object.entries(monthlyData)
 
 ORÇAMENTOS DEFINIDOS:
 ${budgets?.length ? budgets.map((b: any) => `- ${b.category?.name || "Categoria"}: R$ ${b.amount} (${b.period})`).join("\n") : "Nenhum orçamento definido"}
+
+COMPROMISSOS FUTUROS NO CARTÃO DE CRÉDITO (projeção das próximas faturas):
+${projection.length
+  ? projection.map((p) => `- ${p.month}: R$ ${p.committed.toFixed(2)} em parcelas já assumidas + R$ ${p.estimated.toFixed(2)} estimados em gastos recorrentes = R$ ${(p.committed + p.estimated).toFixed(2)} prováveis`).join("\n")
+  : "Nenhuma fatura de cartão importada"}
 `;
 
     const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");

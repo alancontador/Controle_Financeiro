@@ -7,6 +7,7 @@ import { Header } from "@/components/dashboard/Header";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { BalanceChart } from "@/components/dashboard/BalanceChartReal";
 import { GoalsCard } from "@/components/dashboard/GoalsCard";
+import { UpcomingInvoicesCard } from "@/components/dashboard/UpcomingInvoicesCard";
 import { RecentTransactionsReal } from "@/components/dashboard/RecentTransactionsReal";
 import { ExpensesByCategory } from "@/components/dashboard/ExpensesByCategory";
 import { DashboardBudgetAlerts } from "@/components/dashboard/DashboardBudgetAlerts";
@@ -116,7 +117,10 @@ const Index = () => {
         {/* Secondary Content Grid - Responsive */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
           <RecentTransactionsReal transactions={recentTransactions} loading={loading} />
-          <GoalsCard />
+          <div className="space-y-4 lg:space-y-6">
+            <UpcomingInvoicesCard />
+            <GoalsCard />
+          </div>
         </div>
 
         {/* Footer Microcopy */}

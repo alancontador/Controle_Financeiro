@@ -20,13 +20,15 @@ interface Props {
   parsed?: BradescoParseResult | null;
   /** Lista de categorias oferecida na revisao. Padrao: a lista fixa do cartao. */
   categoryOptions?: string[];
+  /** Sugestao de categoria por descricao (memoria + regras). Se ausente, fica a do parser. */
+  suggest?: (description: string) => string;
 }
 
 type Conferencia = Pick<BradescoParseResult, 'totalFatura' | 'parsedTotal' | 'cardTotals' | 'dueDate'>;
 
 const sameCents = (a: number, b: number) => Math.abs(a - b) < 0.005;
 
-export function ImportPdfModal({ open, onClose, onConfirm, parsed, categoryOptions }: Props) {
+export function ImportPdfModal({ open, onClose, onConfirm, parsed, categoryOptions, suggest }: Props) {
   const [items, setItems] = useState<BradescoItem[]>([]);
   const [previousBalance, setPreviousBalance] = useState(0);
   const [conferencia, setConferencia] = useState<Conferencia | null>(null);
@@ -42,13 +44,14 @@ export function ImportPdfModal({ open, onClose, onConfirm, parsed, categoryOptio
   };
 
   const applyResult = (result: BradescoParseResult) => {
-    setItems(result.items);
+    setItems(suggest ? result.items.map((i) => ({ ...i, category: suggest(i.description) })) : result.items);
     setPreviousBalance(result.previousBalance);
     setConferencia(result);
   };
 
   useEffect(() => {
     if (open && parsed && !parsed.error) applyResult(parsed);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- so re-aplica quando o resultado muda
   }, [open, parsed]);
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {

@@ -11,6 +11,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/hooks/useAuth';
 import { useInvoices } from '@/hooks/useCreditCards';
+import { useInvoiceImport, type Categorization, type ImportableItem } from '@/hooks/useInvoiceImport';
+import { UpcomingInvoices } from '@/components/cards/UpcomingInvoices';
 import { AddItemModal } from '@/components/cards/AddItemModal';
 import { ImportExcelModal } from '@/components/cards/ImportExcelModal';
 import { ImportPdfModal } from '@/components/cards/ImportPdfModal';
@@ -25,7 +27,7 @@ const CardInvoices = () => {
   const navigate = useNavigate();
   const {
     card, invoices, holders, items, loading,
-    fetchItems, createInvoice, deleteInvoice, addItem, addItemsBatch, updatePreviousBalance,
+    fetchAll, fetchItems, createInvoice, deleteInvoice, addItem, addItemsBatch, updatePreviousBalance,
   } = useInvoices(cardId || '');
 
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string>('');
@@ -33,6 +35,13 @@ const CardInvoices = () => {
   const [excelModalOpen, setExcelModalOpen] = useState(false);
   const [pdfModalOpen, setPdfModalOpen] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const { loadCategorization, writeItems } = useInvoiceImport();
+  const [categorization, setCategorization] = useState<Categorization | null>(null);
+
+  const openPdfModal = async () => {
+    setCategorization(await loadCategorization());
+    setPdfModalOpen(true);
+  };
 
   useEffect(() => {
     if (!authLoading && !user) navigate('/auth');
@@ -111,11 +120,13 @@ const CardInvoices = () => {
     if (selectedInvoiceId) await addItemsBatch(selectedInvoiceId, importItems);
   };
 
-  const handlePdfImport = async (importItems: any[], prevBalance: number) => {
-    if (selectedInvoiceId) {
-      await addItemsBatch(selectedInvoiceId, importItems);
-      if (prevBalance > 0) await updatePreviousBalance(selectedInvoiceId, prevBalance);
-    }
+  const handlePdfImport = async (importItems: ImportableItem[], prevBalance: number) => {
+    if (!selectedInvoiceId || !categorization) return;
+    const ok = await writeItems(selectedInvoiceId, importItems, categorization);
+    if (!ok) return;
+    if (prevBalance > 0) await updatePreviousBalance(selectedInvoiceId, prevBalance);
+    await fetchItems(selectedInvoiceId);
+    await fetchAll();
   };
 
   return (
@@ -189,6 +200,9 @@ const CardInvoices = () => {
                 )}
               </CardContent>
             </Card>
+            <div className="mt-4">
+              <UpcomingInvoices cardId={cardId} months={6} />
+            </div>
           </div>
 
           {/* Invoice details */}
@@ -212,7 +226,7 @@ const CardInvoices = () => {
                           <Button size="sm" variant="outline" onClick={() => setExcelModalOpen(true)}>
                             <FileSpreadsheet className="w-4 h-4 mr-1" /> Importar Excel/CSV
                           </Button>
-                          <Button size="sm" variant="outline" onClick={() => setPdfModalOpen(true)}>
+                          <Button size="sm" variant="outline" onClick={openPdfModal}>
                             <Upload className="w-4 h-4 mr-1" /> Importar PDF Bradesco
                           </Button>
                         </>
@@ -330,6 +344,8 @@ const CardInvoices = () => {
 
         <ImportPdfModal
           open={pdfModalOpen}
+          categoryOptions={categorization?.options}
+          suggest={categorization?.suggest}
           onClose={() => setPdfModalOpen(false)}
           onConfirm={handlePdfImport}
         />

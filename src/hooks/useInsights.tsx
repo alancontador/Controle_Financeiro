@@ -1,4 +1,6 @@
 import { useState, useCallback } from 'react';
+import { projectUpcomingInvoices, type MonthProjection, type ProjectionItem } from '@/lib/cards/projection';
+import { monthKey } from '@/lib/dates';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -51,6 +53,25 @@ export interface InsightsData {
   };
 }
 
+/** Mesma projecao dos cartoes (todos), 6 meses, no formato que a funcao espera. */
+async function loadProjection(): Promise<MonthProjection[]> {
+  const { data } = await supabase
+    .from('invoice_items')
+    .select('description, amount, installment_current, installment_total, invoice:invoices!inner(card_id, period_end)');
+  const items: ProjectionItem[] = (data ?? []).map((row) => {
+    const inv = row.invoice as unknown as { card_id: string; period_end: string };
+    return {
+      cardId: inv.card_id,
+      invoiceMonth: monthKey(inv.period_end),
+      description: row.description,
+      amount: Number(row.amount),
+      installment_current: row.installment_current,
+      installment_total: row.installment_total,
+    };
+  });
+  return projectUpcomingInvoices(items, { months: 6 });
+}
+
 export function useInsights() {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<InsightsData | null>(null);
@@ -62,7 +83,11 @@ export function useInsights() {
     setError(null);
 
     try {
-      const { data: functionData, error: functionError } = await supabase.functions.invoke('analyze-finances');
+      // Projecao das proximas faturas entra no contexto: a analise de saude
+      // precisa saber o que ja esta comprometido, nao so o que foi gasto.
+      const { data: functionData, error: functionError } = await supabase.functions.invoke('analyze-finances', {
+        body: { projection: await loadProjection() },
+      });
 
       if (functionError) {
         throw new Error(functionError.message);

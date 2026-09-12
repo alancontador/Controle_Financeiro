@@ -11,7 +11,7 @@ import { extractPdfLines } from '@/lib/pdf/extractText';
 import { parseBradescoFatura, type BradescoParseResult } from '@/lib/pdf/bradesco';
 import { CardModal, type CardFormData } from '@/components/cards/CardModal';
 import { ImportPdfModal, type ImportedInvoiceItem } from '@/components/cards/ImportPdfModal';
-import { useInvoiceImport } from '@/hooks/useInvoiceImport';
+import { useInvoiceImport, type Categorization } from '@/hooks/useInvoiceImport';
 import type { CreditCard, Invoice } from '@/hooks/useCreditCards';
 
 interface Props {
@@ -44,11 +44,12 @@ function cardFromHeader(parsed: BradescoParseResult): Partial<CardFormData> {
  */
 export function ImportInvoiceFlow({ cards, createCard, onImported }: Props) {
   const { toast } = useToast();
-  const { findCardByLastFour, findExistingInvoice, importInvoice } = useInvoiceImport();
+  const { findCardByLastFour, findExistingInvoice, importInvoice, loadCategorization } = useInvoiceImport();
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [busy, setBusy] = useState(false);
   const [parsed, setParsed] = useState<BradescoParseResult | null>(null);
+  const [categorization, setCategorization] = useState<Categorization | null>(null);
   const [cardId, setCardId] = useState<string | null>(null);
   const [cardModalOpen, setCardModalOpen] = useState(false);
   const [duplicate, setDuplicate] = useState<Invoice | null>(null);
@@ -62,6 +63,7 @@ export function ImportInvoiceFlow({ cards, createCard, onImported }: Props) {
   const resetAll = () => {
     replacingRef.current = false;
     setParsed(null);
+    setCategorization(null);
     setCardId(null);
     setCardModalOpen(false);
     setDuplicate(null);
@@ -89,6 +91,7 @@ export function ImportInvoiceFlow({ cards, createCard, onImported }: Props) {
         return;
       }
       setParsed(result);
+      setCategorization(await loadCategorization());
       const existing = findCardByLastFour(cards, result.header.lastFour);
       if (existing) {
         await continueWithCard(existing.id, result);
@@ -129,10 +132,10 @@ export function ImportInvoiceFlow({ cards, createCard, onImported }: Props) {
   };
 
   const handleConfirm = async (items: ImportedInvoiceItem[], previousBalance: number) => {
-    if (!parsed || !cardId) return;
+    if (!parsed || !cardId || !categorization) return;
     setBusy(true);
     const outcome = await importInvoice(
-      { cardId, header: parsed.header, items, previousBalance, closingDate: parsed.header.closingDate! },
+      { cardId, header: parsed.header, items, previousBalance, closingDate: parsed.header.closingDate!, categorization },
       { replace },
     );
     setBusy(false);
@@ -184,6 +187,8 @@ export function ImportInvoiceFlow({ cards, createCard, onImported }: Props) {
       <ImportPdfModal
         open={reviewOpen}
         parsed={parsed}
+        categoryOptions={categorization?.options}
+        suggest={categorization?.suggest}
         onClose={resetAll}
         onConfirm={handleConfirm}
       />
