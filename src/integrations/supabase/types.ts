@@ -131,6 +131,27 @@ export type Database = {
           },
         ]
       }
+      category_memory: {
+        Row: {
+          user_id: string
+          key: string
+          category_name: string
+          updated_at: string
+        }
+        Insert: {
+          user_id: string
+          key: string
+          category_name: string
+          updated_at?: string
+        }
+        Update: {
+          user_id?: string
+          key?: string
+          category_name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       credit_cards: {
         Row: {
           brand: string

@@ -23,7 +23,7 @@ import type { CreditCard as CreditCardType } from '@/hooks/useCreditCards';
 const Cards = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
-  const { cards, loading, openInvoiceTotals, createCard, updateCard, deleteCard } = useCreditCards();
+  const { cards, loading, openInvoiceTotals, usage, createCard, updateCard, deleteCard } = useCreditCards();
   const { byCard, overall, refetch: refetchPeople } = useCardPeople();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingCard, setEditingCard] = useState<CreditCardType | null>(null);
@@ -92,6 +92,7 @@ const Cards = () => {
                 <CreditCardVisual
                   card={card}
                   usedAmount={openInvoiceTotals[card.id] || 0}
+                  usage={usage[card.id]}
                   onEdit={() => { setEditingCard(card); setModalOpen(true); }}
                   onViewInvoices={() => navigate(`/cartoes/${card.id}/faturas`)}
                   onDelete={() => setDeletingCard(card)}

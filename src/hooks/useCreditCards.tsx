@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { computeCardUsage, type CardUsage } from '@/lib/cards/usage';
 
 export interface CreditCard {
   id: string;
@@ -60,6 +61,8 @@ export function useCreditCards() {
   const [cards, setCards] = useState<CreditCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [openInvoiceTotals, setOpenInvoiceTotals] = useState<Record<string, number>>({});
+  /** Uso do limite por cartao: faturas nao pagas + parcelas futuras (como o banco calcula). */
+  const [usage, setUsage] = useState<Record<string, CardUsage>>({});
 
   const fetchCards = useCallback(async () => {
     if (!user) return;
@@ -73,16 +76,22 @@ export function useCreditCards() {
       toast({ title: 'Erro ao carregar cartões', description: error.message, variant: 'destructive' });
     } else {
       setCards(data || []);
-      // Fetch open invoice totals
+      // Uso do limite: faturas nao pagas + parcelas futuras da fatura mais recente
       const { data: invoices } = await supabase
         .from('invoices')
-        .select('card_id, total_amount')
-        .eq('status', 'OPEN');
-      
+        .select('id, card_id, period_end, status, total_amount');
+      const invoiceIds = (invoices ?? []).map((i) => i.id);
+      const { data: items } = invoiceIds.length
+        ? await supabase.from('invoice_items').select('invoice_id, amount, installment_current, installment_total').in('invoice_id', invoiceIds).not('installment_total', 'is', null)
+        : { data: [] as { invoice_id: string; amount: number; installment_current: number | null; installment_total: number | null }[] };
+
+      const computed = computeCardUsage(
+        (invoices ?? []).map((i) => ({ ...i, total_amount: Number(i.total_amount) })),
+        (items ?? []).map((i) => ({ ...i, amount: Number(i.amount) })),
+      );
+      setUsage(computed);
       const totals: Record<string, number> = {};
-      (invoices || []).forEach((inv: any) => {
-        totals[inv.card_id] = (totals[inv.card_id] || 0) + Number(inv.total_amount);
-      });
+      for (const [cardId, u] of Object.entries(computed)) totals[cardId] = u.used;
       setOpenInvoiceTotals(totals);
     }
     setLoading(false);
@@ -153,7 +162,7 @@ export function useCreditCards() {
     }
   };
 
-  return { cards, loading, openInvoiceTotals, fetchCards, createCard, updateCard, deleteCard };
+  return { cards, loading, openInvoiceTotals, usage, fetchCards, createCard, updateCard, deleteCard };
 }
 
 export function useInvoices(cardId: string) {

@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/hooks/useAuth';
-import { useInvoices } from '@/hooks/useCreditCards';
+import { useCreditCards, useInvoices } from '@/hooks/useCreditCards';
 import { useInvoiceImport, type Categorization, type ImportableItem } from '@/hooks/useInvoiceImport';
 import { UpcomingInvoices } from '@/components/cards/UpcomingInvoices';
 import { CARD_KIND_LABEL, type CardKind, type InvoiceCard } from '@/lib/cards/kinds';
@@ -30,6 +30,7 @@ const CardInvoices = () => {
     card, invoices, holders, items, loading,
     fetchAll, fetchItems, createInvoice, deleteInvoice, addItem, addItemsBatch, updatePreviousBalance,
   } = useInvoices(cardId || '');
+  const { usage: usageByCard } = useCreditCards();
 
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string>('');
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -119,8 +120,10 @@ const CardInvoices = () => {
   // card_holders tem uma linha por cartao; os modais de lancamento manual querem pessoas.
   const uniqueHolders = holders.filter((h, i, arr) => arr.findIndex(o => o.holder_name === h.holder_name) === i);
 
-  const openInvoiceTotal = invoices
-    .filter(i => i.status === 'OPEN')
+  // Mesmo calculo do banco: faturas nao pagas + parcelas futuras da fatura mais recente.
+  const cardUsage = usageByCard[card.id];
+  const openInvoiceTotal = cardUsage?.used ?? invoices
+    .filter(i => i.status !== 'PAID')
     .reduce((s, i) => s + Number(i.total_amount), 0);
   const available = card.total_limit - openInvoiceTotal;
 

@@ -80,8 +80,10 @@ export function useInvoiceImport() {
   const loadCategorization = useCallback(async (): Promise<Categorization> => {
     if (!user) return { options: [FALLBACK_CATEGORY], suggest: () => FALLBACK_CATEGORY, idByName: new Map() };
 
-    const [catsRes, itemsRes, txRes] = await Promise.all([
+    const [catsRes, memRes, itemsRes, txRes] = await Promise.all([
       supabase.from('categories').select('id, name, type').eq('user_id', user.id).eq('type', 'expense'),
+      // Escolhas do usuario gravadas explicitamente: sobrevivem a exclusao/substituicao de faturas.
+      supabase.from('category_memory').select('key, category_name').eq('user_id', user.id).limit(5000),
       // RLS ja restringe aos cartoes do usuario. Mais recentes primeiro: a ultima correcao vence.
       supabase.from('invoice_items').select('description, category').neq('category', FALLBACK_CATEGORY)
         .order('created_at', { ascending: false }).limit(2000),
@@ -107,7 +109,11 @@ export function useInvoiceImport() {
       const key = normalizeDescription(description);
       if (key && !memory.has(key)) memory.set(key, category);
     };
-    // Transacoes primeiro: e onde o usuario edita categoria no dia a dia.
+    // 1) memoria explicita (o que o usuario escolheu ao importar/editar) vence tudo
+    for (const m of memRes.data ?? []) {
+      if (m.key && m.category_name && idByName.has(m.category_name) && !memory.has(m.key)) memory.set(m.key, m.category_name);
+    }
+    // 2) transacoes: onde o usuario edita categoria no dia a dia
     for (const t of txRes.data ?? []) {
       const cat = t.category as unknown as { name: string } | null;
       remember(t.description, cat?.name);
@@ -181,6 +187,21 @@ export function useInvoiceImport() {
       if (error) {
         toast({ title: 'Erro ao gravar os lançamentos', description: error.message, variant: 'destructive' });
         return false;
+      }
+
+      // Lembra as categorias escolhidas (por descricao normalizada) para as proximas faturas,
+      // mesmo que esta fatura seja excluida ou substituida depois.
+      const memoryRows = new Map<string, string>();
+      for (const item of items) {
+        if (!item.category || item.category === FALLBACK_CATEGORY) continue;
+        const key = normalizeDescription(item.description);
+        if (key) memoryRows.set(key, item.category);
+      }
+      if (memoryRows.size > 0) {
+        await supabase.from('category_memory').upsert(
+          [...memoryRows].map(([key, category_name]) => ({ user_id: user.id, key, category_name, updated_at: new Date().toISOString() })),
+          { onConflict: 'user_id,key' },
+        );
       }
 
       const mirrored = (inserted ?? [])

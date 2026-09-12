@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { FALLBACK_CATEGORY, normalizeDescription } from "@/lib/pdf/categorize";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -37,6 +38,16 @@ export interface TransactionFilters {
   startDate: Date | null;
   endDate: Date | null;
   search: string;
+}
+
+/** Grava a escolha de categoria do usuario para reconhecer a mesma despesa no futuro. */
+async function rememberCategory(userId: string, description: string, categoryName: string | undefined) {
+  if (!categoryName || categoryName === FALLBACK_CATEGORY) return;
+  const key = normalizeDescription(description);
+  if (!key) return;
+  await supabase
+    .from("category_memory")
+    .upsert({ user_id: userId, key, category_name: categoryName, updated_at: new Date().toISOString() }, { onConflict: "user_id,key" });
 }
 
 export function useTransactions() {
@@ -161,6 +172,10 @@ export function useTransactions() {
     }
 
     setTransactions((prev) => [data as Transaction, ...prev]);
+    {
+      const saved = data as Transaction;
+      if (saved.type === "expense" && saved.category?.name) void rememberCategory(user.id, saved.description, saved.category.name);
+    }
     toast({
       title: "Transação adicionada",
       description: "Sua transação foi registrada com sucesso.",
@@ -194,6 +209,13 @@ export function useTransactions() {
     setTransactions((prev) =>
       prev.map((t) => (t.id === id ? (data as Transaction) : t))
     );
+    {
+      // Trocar a categoria de uma despesa ensina o app para a proxima fatura.
+      const saved = data as Transaction;
+      if (saved.type === "expense" && "category_id" in updates && saved.category?.name) {
+        void rememberCategory(user.id, saved.description, saved.category.name);
+      }
+    }
     toast({
       title: "Transação atualizada",
       description: "Sua transação foi atualizada com sucesso.",

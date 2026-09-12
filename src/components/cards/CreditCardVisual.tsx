@@ -9,6 +9,8 @@ interface Props {
   onEdit: () => void;
   onViewInvoices: () => void;
   onDelete?: () => void;
+  /** Composicao do utilizado, para explicar o numero. */
+  usage?: { openInvoices: number; futureInstallments: number };
 }
 
 const brandColors: Record<string, string> = {
@@ -20,7 +22,7 @@ const brandColors: Record<string, string> = {
   Outro: 'from-gray-600 to-gray-800',
 };
 
-export function CreditCardVisual({ card, usedAmount, onEdit, onViewInvoices, onDelete }: Props) {
+export function CreditCardVisual({ card, usedAmount, onEdit, onViewInvoices, onDelete, usage }: Props) {
   const available = card.total_limit - usedAmount;
   const usagePercent = card.total_limit > 0 ? Math.min((usedAmount / card.total_limit) * 100, 100) : 0;
 
@@ -53,11 +55,22 @@ export function CreditCardVisual({ card, usedAmount, onEdit, onViewInvoices, onD
           <span className="font-semibold text-foreground">{fmt(card.total_limit)}</span>
         </div>
         <div className="flex justify-between text-sm">
+          <span className="text-muted-foreground">Utilizado</span>
+          <span className="font-semibold text-foreground">{fmt(usedAmount)}</span>
+        </div>
+        {usage && (
+          <p className="text-xs text-muted-foreground -mt-2">
+            {fmt(usage.openInvoices)} em faturas em aberto + {fmt(usage.futureInstallments)} em parcelas futuras
+          </p>
+        )}
+        <div className="flex justify-between text-sm">
           <span className="text-muted-foreground">Disponível</span>
-          <span className={`font-semibold ${available < 0 ? 'text-destructive' : 'text-accent'}`}>{fmt(available)}</span>
+          <span className={`font-semibold ${available < 0 ? 'text-destructive' : 'text-accent'}`}>
+            {available < 0 ? `${fmt(available)} (acima do limite)` : fmt(available)}
+          </span>
         </div>
         <Progress value={usagePercent} className="h-2" />
-        <p className="text-xs text-muted-foreground text-right">{usagePercent.toFixed(0)}% utilizado</p>
+        <p className="text-xs text-muted-foreground text-right">{usagePercent.toFixed(0)}% utilizado{usage ? ' · compras após o último fechamento entram na próxima fatura' : ''}</p>
 
         <div className="flex gap-2 pt-1">
           <Button variant="outline" size="sm" className="flex-1" onClick={onViewInvoices}>
