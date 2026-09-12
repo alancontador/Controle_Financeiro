@@ -10,6 +10,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useAuth } from '@/hooks/useAuth';
 import { useInsights } from '@/hooks/useInsights';
 import { HealthScore } from '@/components/insights/HealthScore';
+import { PersonInsights } from '@/components/insights/PersonInsights';
 import { SpendingPatterns } from '@/components/insights/SpendingPatterns';
 import { SavingsTips } from '@/components/insights/SavingsTips';
 import { ActionItems } from '@/components/insights/ActionItems';
@@ -152,6 +153,11 @@ export default function Insights() {
             <div className="space-y-6">
               {/* Health Score */}
               <HealthScore summary={data.insights.summary} />
+
+              {/* Por pessoa */}
+              {data.insights.by_person && data.insights.by_person.length > 0 && (
+                <PersonInsights people={data.insights.by_person} />
+              )}
 
               {/* Two column layout */}
               <div className="grid lg:grid-cols-2 gap-6">

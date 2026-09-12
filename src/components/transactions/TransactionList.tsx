@@ -133,6 +133,12 @@ export function TransactionList({
                             {transaction.category.name}
                           </span>
                         )}
+                        {transaction.holder_name && (
+                          <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary" title="Pessoa">
+                            {transaction.holder_name}
+                            {transaction.card_last_four ? ` · ${transaction.card_last_four}` : ''}
+                          </span>
+                        )}
                         {transaction.notes && (
                           <span className="text-xs text-muted-foreground truncate max-w-[150px]">
                             {transaction.notes}

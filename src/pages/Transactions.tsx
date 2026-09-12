@@ -13,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/hooks/useAuth";
+import { usePeople } from "@/hooks/usePeople";
 import { useTransactions, Transaction } from "@/hooks/useTransactions";
 import { useRecurringTransactions, RecurringTransaction } from "@/hooks/useRecurringTransactions";
 import { TransactionFilters } from "@/components/transactions/TransactionFilters";
@@ -38,6 +39,7 @@ const Transactions = () => {
     deleteTransaction,
     importTransactions,
   } = useTransactions();
+  const { people } = usePeople();
 
   const {
     recurringTransactions,
@@ -95,6 +97,7 @@ const Transactions = () => {
     amount: number;
     type: "income" | "expense";
     category_id: string | null;
+    holder_name: string | null;
     date: string;
     notes: string | null;
   }) => {
@@ -355,6 +358,7 @@ const Transactions = () => {
             {/* Filters */}
             <TransactionFilters
               filters={filters}
+              people={people}
               setFilters={setFilters}
               categories={categories}
             />
@@ -396,6 +400,7 @@ const Transactions = () => {
         onClose={handleCloseModal}
         onSubmit={handleSubmit}
         categories={categories}
+        people={people}
         transaction={editingTransaction}
         isLoading={isSubmitting}
       />

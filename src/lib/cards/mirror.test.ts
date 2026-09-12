@@ -3,6 +3,8 @@ import { isPaymentLine, itemToTransaction } from './mirror';
 
 const base = {
   id: 'item-1',
+  holder_name: 'ANA SILVA',
+  card_last_four: '1111',
   description: 'DROGARIA DELTA',
   amount: 47.69,
   transaction_date: '2026-08-07',
@@ -26,6 +28,8 @@ describe('itemToTransaction', () => {
   it('compra vira despesa na data da compra, na categoria, ligada ao item', () => {
     expect(itemToTransaction(base, 'user-1')).toEqual({
       user_id: 'user-1',
+      holder_name: 'ANA SILVA',
+      card_last_four: '1111',
       description: 'DROGARIA DELTA',
       amount: 47.69,
       type: 'expense',

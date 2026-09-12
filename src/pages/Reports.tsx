@@ -13,6 +13,7 @@ import { useReports } from "@/hooks/useReports";
 import { ReportSummary } from "@/components/reports/ReportSummary";
 import { CategoryBreakdown } from "@/components/reports/CategoryBreakdown";
 import { MonthlyComparison } from "@/components/reports/MonthlyComparison";
+import { PeopleBreakdown } from "@/components/reports/PeopleBreakdown";
 import {
   ChevronLeft,
   ChevronRight,
@@ -241,6 +242,9 @@ export default function Reports() {
                   currentMonth={selectedMonth}
                   previousMonths={previousMonths}
                 />
+
+                {/* Por pessoa */}
+                <PeopleBreakdown />
               </>
             )}
           </div>

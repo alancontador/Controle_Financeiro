@@ -15,14 +15,25 @@ export interface Transaction {
   type: "income" | "expense";
   date: string;
   notes: string | null;
+  /** Quem gastou; null = Casa/Comum. */
+  holder_name: string | null;
+  card_last_four: string | null;
   created_at: string;
   updated_at: string;
   category?: Category;
 }
 
+/** Campos de escrita: pessoa e cartao sao opcionais (lancamento manual pode nao ter). */
+export type TransactionInput = Omit<Transaction, "id" | "user_id" | "created_at" | "updated_at" | "category" | "holder_name" | "card_last_four"> & {
+  holder_name?: string | null;
+  card_last_four?: string | null;
+};
+
 export interface TransactionFilters {
   type: "all" | "income" | "expense";
   categoryId: string | null;
+  /** "all" | nome da pessoa | "__common" (sem pessoa). */
+  person: string;
   startDate: Date | null;
   endDate: Date | null;
   search: string;
@@ -37,6 +48,7 @@ export function useTransactions() {
   const [filters, setFilters] = useState<TransactionFilters>({
     type: "all",
     categoryId: null,
+    person: "all",
     startDate: null,
     endDate: null,
     search: "",
@@ -91,6 +103,12 @@ export function useTransactions() {
       query = query.eq("category_id", filters.categoryId);
     }
 
+    if (filters.person === "__common") {
+      query = query.is("holder_name", null);
+    } else if (filters.person !== "all") {
+      query = query.eq("holder_name", filters.person);
+    }
+
     if (filters.startDate) {
       query = query.gte("date", filters.startDate.toISOString().split("T")[0]);
     }
@@ -120,7 +138,7 @@ export function useTransactions() {
   }, [user, filters, toast]);
 
   const addTransaction = async (
-    transaction: Omit<Transaction, "id" | "user_id" | "created_at" | "updated_at" | "category">
+    transaction: TransactionInput
   ) => {
     if (!user) return null;
 
@@ -152,7 +170,7 @@ export function useTransactions() {
 
   const updateTransaction = async (
     id: string,
-    updates: Partial<Omit<Transaction, "id" | "user_id" | "created_at" | "updated_at" | "category">>
+    updates: Partial<TransactionInput>
   ) => {
     if (!user) return null;
 
@@ -210,7 +228,7 @@ export function useTransactions() {
   };
 
   const importTransactions = async (
-    transactionsToImport: Omit<Transaction, "id" | "user_id" | "created_at" | "updated_at" | "category">[]
+    transactionsToImport: TransactionInput[]
   ) => {
     if (!user) return false;
 

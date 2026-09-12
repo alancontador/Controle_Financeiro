@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { projectUpcomingInvoices, type MonthProjection, type ProjectionItem } from '@/lib/cards/projection';
+import { projectUpcomingInvoices, projectUpcomingInvoicesByPerson, type MonthProjection, type ProjectionItem } from '@/lib/cards/projection';
 import { monthKey } from '@/lib/dates';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -36,8 +36,19 @@ export interface ActionItem {
   timeframe: string;
 }
 
+export interface PersonInsight {
+  person: string;
+  status: 'excellent' | 'good' | 'attention' | 'critical';
+  main_message: string;
+  top_issue: string;
+  suggestion: string;
+  potential_savings: number;
+}
+
 export interface FinancialInsights {
   summary: FinancialSummary;
+  /** Diagnostico por pessoa: onde esta o gargalo e o que cada uma precisa ajustar. */
+  by_person?: PersonInsight[];
   patterns: SpendingPattern[];
   savings_tips: SavingsTip[];
   monthly_trend: MonthlyTrend;
@@ -54,14 +65,15 @@ export interface InsightsData {
 }
 
 /** Mesma projecao dos cartoes (todos), 6 meses, no formato que a funcao espera. */
-async function loadProjection(): Promise<MonthProjection[]> {
+async function loadProjection(): Promise<{ projection: MonthProjection[]; projectionByPerson: Record<string, MonthProjection[]> }> {
   const { data } = await supabase
     .from('invoice_items')
-    .select('description, amount, installment_current, installment_total, invoice:invoices!inner(card_id, period_end)');
+    .select('holder_name, description, amount, installment_current, installment_total, invoice:invoices!inner(card_id, period_end)');
   const items: ProjectionItem[] = (data ?? []).map((row) => {
     const inv = row.invoice as unknown as { card_id: string; period_end: string };
     return {
       cardId: inv.card_id,
+      holder: row.holder_name,
       invoiceMonth: monthKey(inv.period_end),
       description: row.description,
       amount: Number(row.amount),
@@ -69,7 +81,10 @@ async function loadProjection(): Promise<MonthProjection[]> {
       installment_total: row.installment_total,
     };
   });
-  return projectUpcomingInvoices(items, { months: 6 });
+  return {
+    projection: projectUpcomingInvoices(items, { months: 6 }),
+    projectionByPerson: projectUpcomingInvoicesByPerson(items, { months: 6 }),
+  };
 }
 
 export function useInsights() {
@@ -86,7 +101,7 @@ export function useInsights() {
       // Projecao das proximas faturas entra no contexto: a analise de saude
       // precisa saber o que ja esta comprometido, nao so o que foi gasto.
       const { data: functionData, error: functionError } = await supabase.functions.invoke('analyze-finances', {
-        body: { projection: await loadProjection() },
+        body: await loadProjection(),
       });
 
       if (functionError) {

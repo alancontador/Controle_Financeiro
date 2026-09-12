@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { projectUpcomingInvoices, type ProjectionItem } from './projection';
+import { projectUpcomingInvoices, projectUpcomingInvoicesByPerson, type ProjectionItem } from './projection';
 
 const item = (over: Partial<ProjectionItem>): ProjectionItem => ({
   cardId: 'card-1',
+  holder: 'ANA',
   invoiceMonth: '2026-08',
   description: 'LOJA',
   amount: 100,
@@ -105,5 +106,39 @@ describe('projectUpcomingInvoices', () => {
 
   it('sem itens devolve lista vazia', () => {
     expect(projectUpcomingInvoices([], { months: 3 })).toEqual([]);
+  });
+
+  it('por pessoa: cada uma com sua serie, no mesmo eixo de meses, e a soma bate com o total', () => {
+    const items = [
+      item({ holder: 'ANA', amount: 100, installment_current: 1, installment_total: 3 }),
+      item({ holder: 'BRUNO', amount: 40, installment_current: 1, installment_total: 2 }),
+      item({ holder: 'BRUNO', invoiceMonth: '2026-07', description: 'NETFLIX', amount: 30 }),
+      item({ holder: 'BRUNO', invoiceMonth: '2026-08', description: 'NETFLIX', amount: 30 }),
+    ];
+    const by = projectUpcomingInvoicesByPerson(items, { months: 2 });
+    expect(Object.keys(by).sort()).toEqual(['ANA', 'BRUNO']);
+    expect(by.ANA.map((m) => [m.month, m.committed, m.estimated])).toEqual([['2026-09', 100, 0], ['2026-10', 100, 0]]);
+    expect(by.BRUNO.map((m) => [m.month, m.committed, m.estimated])).toEqual([['2026-09', 40, 30], ['2026-10', 0, 30]]);
+    const total = projectUpcomingInvoices(items, { months: 2 });
+    for (let k = 0; k < 2; k++) {
+      expect(by.ANA[k].committed + by.BRUNO[k].committed).toBe(total[k].committed);
+      expect(by.ANA[k].estimated + by.BRUNO[k].estimated).toBe(total[k].estimated);
+    }
+  });
+
+  it('por pessoa: item sem titular cai em Casa/Comum', () => {
+    const by = projectUpcomingInvoicesByPerson([item({ holder: '', amount: 10, installment_current: 1, installment_total: 2 })], { months: 1 });
+    expect(Object.keys(by)).toEqual(['Casa/Comum']);
+  });
+
+  it('por pessoa: quem so aparece numa fatura antiga nao projeta parcelas velhas', () => {
+    const items = [
+      item({ holder: 'ANA', invoiceMonth: '2026-08', amount: 100, installment_current: 2, installment_total: 3 }),
+      // BRUNO so na fatura de julho, com parcela 1/3: em agosto ela nao apareceu, logo foi quitada/cancelada
+      item({ holder: 'BRUNO', invoiceMonth: '2026-07', amount: 90, installment_current: 1, installment_total: 3 }),
+    ];
+    const by = projectUpcomingInvoicesByPerson(items, { months: 2 });
+    expect(by.ANA.map((m) => m.month)).toEqual(['2026-09', '2026-10']);
+    expect(by.BRUNO.map((m) => [m.month, m.committed])).toEqual([['2026-09', 0], ['2026-10', 0]]);
   });
 });

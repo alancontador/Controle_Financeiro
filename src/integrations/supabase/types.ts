@@ -592,6 +592,8 @@ export type Database = {
           updated_at: string
           user_id: string
           invoice_item_id: string | null
+          holder_name: string | null
+          card_last_four: string | null
         }
         Insert: {
           amount: number
@@ -605,6 +607,8 @@ export type Database = {
           updated_at?: string
           user_id: string
           invoice_item_id?: string | null
+          holder_name?: string | null
+          card_last_four?: string | null
         }
         Update: {
           amount?: number
@@ -618,6 +622,8 @@ export type Database = {
           updated_at?: string
           user_id?: string
           invoice_item_id?: string | null
+          holder_name?: string | null
+          card_last_four?: string | null
         }
         Relationships: [
           {

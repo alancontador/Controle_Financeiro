@@ -80,7 +80,25 @@ const INSIGHTS_SCHEMA = {
       },
     },
   },
-  required: ["summary", "patterns", "savings_tips", "monthly_trend", "action_items"],
+  required: ["summary", "patterns", "savings_tips", "monthly_trend", "action_items", "by_person"],
+};
+
+// Adicionado ao schema acima: diagnostico por pessoa.
+(INSIGHTS_SCHEMA.properties as Record<string, unknown>).by_person = {
+  type: "array",
+  description: "Um item por pessoa da casa (inclusive 'Casa/Comum' se houver gasto sem dono): onde esta o gargalo e o que ela precisa ajustar",
+  items: {
+    type: "object",
+    properties: {
+      person: { type: "string" },
+      status: { type: "string", enum: ["excellent", "good", "attention", "critical"] },
+      main_message: { type: "string", description: "Diagnostico em 1-2 frases" },
+      top_issue: { type: "string", description: "O maior gargalo dessa pessoa (categoria/habito) com numeros" },
+      suggestion: { type: "string", description: "O ajuste concreto que ela deveria fazer" },
+      potential_savings: { type: "number", description: "Economia potencial mensal em reais" },
+    },
+    required: ["person", "status", "main_message", "top_issue", "suggestion", "potential_savings"],
+  },
 };
 
 serve(async (req) => {
@@ -91,9 +109,11 @@ serve(async (req) => {
   try {
     // Projecao das proximas faturas de cartao, calculada no front (mesma regra da tela).
     let projection: Array<{ month: string; committed: number; estimated: number }> = [];
+    let projectionByPerson: Record<string, Array<{ month: string; committed: number; estimated: number }>> = {};
     try {
       const body = await req.json();
       if (Array.isArray(body?.projection)) projection = body.projection;
+      if (body?.projectionByPerson && typeof body.projectionByPerson === "object") projectionByPerson = body.projectionByPerson;
     } catch {
       // sem body: segue sem projecao
     }
@@ -172,6 +192,32 @@ serve(async (req) => {
       }
     });
 
+    // Gastos por pessoa (despesas): total, fatia e top categorias nos ultimos 6 meses,
+    // e o mes mais recente separado - e o que permite apontar o gargalo.
+    const COMMON = "Casa/Comum";
+    const expenses = (transactions ?? []).filter((t: any) => t.type === "expense");
+    const personOf = (t: any) => (t.holder_name && String(t.holder_name).trim()) || COMMON;
+    const byPerson: Record<string, { total: number; cats: Record<string, number>; lastMonth: number }> = {};
+    const lastMonth = expenses.map((t: any) => String(t.date).slice(0, 7)).sort().at(-1);
+    for (const t of expenses) {
+      const p = personOf(t);
+      const e = (byPerson[p] ??= { total: 0, cats: {}, lastMonth: 0 });
+      e.total += Number(t.amount);
+      const c = t.category?.name || "Sem categoria";
+      e.cats[c] = (e.cats[c] || 0) + Number(t.amount);
+      if (String(t.date).slice(0, 7) === lastMonth) e.lastMonth += Number(t.amount);
+    }
+    const personLines = Object.entries(byPerson)
+      .sort(([, a], [, b]) => b.total - a.total)
+      .map(([p, e]) => {
+        const share = totalExpenses > 0 ? ((e.total / totalExpenses) * 100).toFixed(1) : "0.0";
+        const top = Object.entries(e.cats).sort(([, a], [, b]) => b - a).slice(0, 4)
+          .map(([c, v]) => `${c} R$ ${v.toFixed(2)}`).join(", ");
+        const proj = projectionByPerson[p]?.[0];
+        const projTxt = proj ? ` | proxima fatura provavel: R$ ${(proj.committed + proj.estimated).toFixed(2)} (R$ ${proj.committed.toFixed(2)} em parcelas)` : "";
+        return `- ${p}: R$ ${e.total.toFixed(2)} no periodo (${share}% do total); ultimo mes R$ ${e.lastMonth.toFixed(2)}; maiores categorias: ${top}${projTxt}`;
+      });
+
     const financialContext = `
 Dados Financeiros do Usuário (últimos 6 meses):
 
@@ -195,6 +241,9 @@ ${Object.entries(monthlyData)
 
 ORÇAMENTOS DEFINIDOS:
 ${budgets?.length ? budgets.map((b: any) => `- ${b.category?.name || "Categoria"}: R$ ${b.amount} (${b.period})`).join("\n") : "Nenhum orçamento definido"}
+
+GASTOS POR PESSOA (quem gasta o que; "Casa/Comum" = sem dono definido):
+${personLines.length ? personLines.join("\n") : "Nenhuma despesa atribuida a pessoas"}
 
 COMPROMISSOS FUTUROS NO CARTÃO DE CRÉDITO (projeção das próximas faturas):
 ${projection.length
@@ -226,7 +275,8 @@ Diretrizes:
 2. Use os dados reais para fazer comparacoes e identificar padroes
 3. Priorize sugestoes por impacto financeiro
 4. Seja encorajador mas realista
-5. Identifique tanto pontos positivos quanto areas de melhoria`,
+5. Identifique tanto pontos positivos quanto areas de melhoria
+6. A casa tem mais de uma pessoa gastando. Compare as pessoas: diga quem concentra o gasto, ONDE esta o gargalo de cada uma (categoria/habito, com numeros) e o que cada uma precisa ajustar. Preencha by_person com um item por pessoa. Seja direto e justo: nao culpe quem gasta com necessidades da casa`,
           responseMimeType: "application/json",
           responseSchema: INSIGHTS_SCHEMA,
         },

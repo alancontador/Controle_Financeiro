@@ -14,7 +14,12 @@ const fmtMonth = (m: string) => `${MONTHS[Number(m.slice(5, 7)) - 1]}/${m.slice(
 
 /** Tabela "Proximas faturas": comprometido (parcelas) e estimado (recorrentes), mes a mes. */
 export function UpcomingInvoices({ cardId, months = 6 }: Props) {
-  const { projection, loading } = useUpcomingInvoices(cardId, months);
+  const { projection, byPerson, loading } = useUpcomingInvoices(cardId, months);
+  const people = Object.keys(byPerson).sort((a, b) => {
+    const ta = byPerson[a].reduce((s, m) => s + m.committed + m.estimated, 0);
+    const tb = byPerson[b].reduce((s, m) => s + m.committed + m.estimated, 0);
+    return tb - ta;
+  });
 
   return (
     <Card>
@@ -38,15 +43,24 @@ export function UpcomingInvoices({ cardId, months = 6 }: Props) {
               <TableHeader>
                 <TableRow>
                   <TableHead>Mês</TableHead>
+                  {people.map((p) => <TableHead key={p} className="text-right whitespace-nowrap">{p}</TableHead>)}
                   <TableHead className="text-right">Comprometido</TableHead>
                   <TableHead className="text-right">Estimado</TableHead>
                   <TableHead className="text-right">Provável</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {projection.map((m) => (
+                {projection.map((m, k) => (
                   <TableRow key={m.month}>
                     <TableCell className="font-medium">{fmtMonth(m.month)}</TableCell>
+                    {people.map((p) => {
+                      const v = byPerson[p][k];
+                      return (
+                        <TableCell key={p} className="text-right whitespace-nowrap" title={`${fmt(v.committed)} parcelas + ${fmt(v.estimated)} estimado`}>
+                          {fmt(v.committed + v.estimated)}
+                        </TableCell>
+                      );
+                    })}
                     <TableCell className="text-right whitespace-nowrap">{fmt(m.committed)}</TableCell>
                     <TableCell className="text-right whitespace-nowrap text-muted-foreground">{fmt(m.estimated)}</TableCell>
                     <TableCell className="text-right whitespace-nowrap font-semibold">{fmt(m.committed + m.estimated)}</TableCell>
@@ -54,6 +68,9 @@ export function UpcomingInvoices({ cardId, months = 6 }: Props) {
                 ))}
               </TableBody>
             </Table>
+            {people.length > 0 && (
+              <p className="text-xs text-muted-foreground mt-2">Colunas por pessoa = provável (parcelas + estimado). Passe o mouse para ver a divisão.</p>
+            )}
           </div>
         )}
       </CardContent>

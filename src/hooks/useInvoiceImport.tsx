@@ -177,7 +177,7 @@ export function useInvoiceImport() {
       const { data: inserted, error } = await supabase
         .from('invoice_items')
         .insert(rows)
-        .select('id, description, amount, transaction_date, category_id');
+        .select('id, holder_name, card_last_four, description, amount, transaction_date, category_id');
       if (error) {
         toast({ title: 'Erro ao gravar os lançamentos', description: error.message, variant: 'destructive' });
         return false;

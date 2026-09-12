@@ -24,16 +24,20 @@ interface TransactionFiltersProps {
   filters: Filters;
   setFilters: (filters: Filters) => void;
   categories: Category[];
+  /** Pessoas da casa, para o filtro "Pessoa". */
+  people?: string[];
 }
 
 export function TransactionFilters({
   filters,
   setFilters,
   categories,
+  people = [],
 }: TransactionFiltersProps) {
   const hasActiveFilters =
     filters.type !== "all" ||
     filters.categoryId !== null ||
+    filters.person !== "all" ||
     filters.startDate !== null ||
     filters.endDate !== null;
 
@@ -42,6 +46,7 @@ export function TransactionFilters({
       ...filters,
       type: "all",
       categoryId: null,
+                person: "all",
       startDate: null,
       endDate: null,
     });
@@ -82,6 +87,23 @@ export function TransactionFilters({
               <SelectItem value="all">Todos</SelectItem>
               <SelectItem value="income">Receitas</SelectItem>
               <SelectItem value="expense">Despesas</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Person Filter */}
+          <Select
+            value={filters.person}
+            onValueChange={(value) => setFilters({ ...filters, person: value })}
+          >
+            <SelectTrigger className="w-[170px] bg-secondary/50 border-border/50">
+              <SelectValue placeholder="Pessoa" />
+            </SelectTrigger>
+            <SelectContent className="bg-card border-border">
+              <SelectItem value="all">Todas as pessoas</SelectItem>
+              {people.map((name) => (
+                <SelectItem key={name} value={name}>{name}</SelectItem>
+              ))}
+              <SelectItem value="__common">Casa/Comum (sem pessoa)</SelectItem>
             </SelectContent>
           </Select>
 

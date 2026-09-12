@@ -9,6 +9,7 @@ import { ptBR } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Form,
   FormControl,
@@ -52,6 +53,7 @@ const transactionSchema = z.object({
     ),
   type: z.enum(["income", "expense"]),
   category_id: z.string().optional(),
+  holder_name: z.string().optional(),
   date: z.date({ required_error: "Data é obrigatória" }),
   notes: z
     .string()
@@ -69,11 +71,14 @@ interface TransactionModalProps {
     amount: number;
     type: "income" | "expense";
     category_id: string | null;
+    holder_name: string | null;
     date: string;
     notes: string | null;
   }) => Promise<void>;
   categories: Category[];
   transaction?: Transaction | null;
+  /** Pessoas da casa para o campo "Pessoa". */
+  people?: string[];
   isLoading?: boolean;
 }
 
@@ -84,6 +89,7 @@ export function TransactionModal({
   categories,
   transaction,
   isLoading,
+  people = [],
 }: TransactionModalProps) {
   const form = useForm<TransactionFormData>({
     resolver: zodResolver(transactionSchema),
@@ -113,6 +119,7 @@ export function TransactionModal({
         amount: String(Math.abs(Number(transaction.amount))),
         type: transaction.type,
         category_id: transaction.category_id || undefined,
+        holder_name: transaction.holder_name || "__common",
         date: new Date(transaction.date + "T00:00:00"),
         notes: transaction.notes || "",
       });
@@ -134,6 +141,7 @@ export function TransactionModal({
       amount: parseFloat(data.amount.replace(",", ".")),
       type: data.type,
       category_id: data.category_id || null,
+      holder_name: data.holder_name && data.holder_name !== "__common" ? data.holder_name : null,
       date: format(data.date, "yyyy-MM-dd"),
       notes: data.notes || null,
     });
@@ -329,6 +337,31 @@ export function TransactionModal({
                             />
                           </PopoverContent>
                         </Popover>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Person */}
+                  <FormField
+                    control={form.control}
+                    name="holder_name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Pessoa (opcional)</FormLabel>
+                        <Select value={field.value || "__common"} onValueChange={field.onChange}>
+                          <FormControl>
+                            <SelectTrigger className="bg-secondary/50 border-border/50">
+                              <SelectValue placeholder="Casa/Comum" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent className="bg-card border-border">
+                            <SelectItem value="__common">Casa/Comum (sem pessoa)</SelectItem>
+                            {people.map((name) => (
+                              <SelectItem key={name} value={name}>{name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                         <FormMessage />
                       </FormItem>
                     )}

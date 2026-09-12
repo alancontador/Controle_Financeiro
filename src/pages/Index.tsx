@@ -8,6 +8,7 @@ import { StatCard } from "@/components/dashboard/StatCard";
 import { BalanceChart } from "@/components/dashboard/BalanceChartReal";
 import { GoalsCard } from "@/components/dashboard/GoalsCard";
 import { UpcomingInvoicesCard } from "@/components/dashboard/UpcomingInvoicesCard";
+import { SpendingByPersonCard } from "@/components/dashboard/SpendingByPersonCard";
 import { RecentTransactionsReal } from "@/components/dashboard/RecentTransactionsReal";
 import { ExpensesByCategory } from "@/components/dashboard/ExpensesByCategory";
 import { DashboardBudgetAlerts } from "@/components/dashboard/DashboardBudgetAlerts";
@@ -104,8 +105,13 @@ const Index = () => {
 
         {/* Budget Alerts & Weekly Summary */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6 mb-6">
+          <SpendingByPersonCard />
           <DashboardBudgetAlerts />
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6 mb-6">
           <WeeklySummary />
+          <UpcomingInvoicesCard />
         </div>
 
         {/* Main Content Grid - Responsive */}
@@ -117,10 +123,7 @@ const Index = () => {
         {/* Secondary Content Grid - Responsive */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
           <RecentTransactionsReal transactions={recentTransactions} loading={loading} />
-          <div className="space-y-4 lg:space-y-6">
-            <UpcomingInvoicesCard />
-            <GoalsCard />
-          </div>
+          <GoalsCard />
         </div>
 
         {/* Footer Microcopy */}

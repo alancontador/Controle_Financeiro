@@ -10,6 +10,8 @@
 
 export interface MirrorableItem {
   id: string;
+  holder_name: string;
+  card_last_four: string | null;
   description: string;
   amount: number;
   transaction_date: string;
@@ -18,6 +20,9 @@ export interface MirrorableItem {
 
 export interface MirroredTransaction {
   user_id: string;
+  /** Quem gastou (pessoa do bloco da fatura). */
+  holder_name: string;
+  card_last_four: string | null;
   description: string;
   amount: number;
   type: 'expense';
@@ -39,6 +44,8 @@ export function itemToTransaction(item: MirrorableItem, userId: string): Mirrore
   if (isPaymentLine(item.description)) return null;
   return {
     user_id: userId,
+    holder_name: item.holder_name,
+    card_last_four: item.card_last_four,
     description: item.description,
     amount: item.amount,
     type: 'expense',

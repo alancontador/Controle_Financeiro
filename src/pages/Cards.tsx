@@ -11,6 +11,9 @@ import { CreditCardVisual } from '@/components/cards/CreditCardVisual';
 import { CardModal, type CardFormData } from '@/components/cards/CardModal';
 import { ImportInvoiceFlow } from '@/components/cards/ImportInvoiceFlow';
 import { UpcomingInvoices } from '@/components/cards/UpcomingInvoices';
+import { CardPeopleBreakdown } from '@/components/cards/CardPeopleBreakdown';
+import { WhoSpendsMore } from '@/components/cards/WhoSpendsMore';
+import { useCardPeople } from '@/hooks/useCardPeople';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -21,6 +24,7 @@ const Cards = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { cards, loading, openInvoiceTotals, createCard, updateCard, deleteCard } = useCreditCards();
+  const { byCard, overall, refetch: refetchPeople } = useCardPeople();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingCard, setEditingCard] = useState<CreditCardType | null>(null);
   const [deletingCard, setDeletingCard] = useState<CreditCardType | null>(null);
@@ -62,7 +66,7 @@ const Cards = () => {
               <ImportInvoiceFlow
                 cards={cards}
                 createCard={createCard}
-                onImported={(cardId) => navigate(`/cartoes/${cardId}/faturas`)}
+                onImported={(cardId) => { refetchPeople(); navigate(`/cartoes/${cardId}/faturas`); }}
               />
               <Button onClick={() => { setEditingCard(null); setModalOpen(true); }}>
                 <Plus className="w-4 h-4 mr-2" /> Novo Cartão
@@ -92,13 +96,18 @@ const Cards = () => {
                   onViewInvoices={() => navigate(`/cartoes/${card.id}/faturas`)}
                   onDelete={() => setDeletingCard(card)}
                 />
+                <CardPeopleBreakdown
+                  people={byCard[card.id]?.people ?? []}
+                  invoiceLabel={byCard[card.id]?.invoiceLabel ?? null}
+                />
               </motion.div>
             ))}
           </div>
         )}
 
         {cards.length > 0 && (
-          <div className="mt-8">
+          <div className="mt-8 space-y-6">
+            <WhoSpendsMore overall={overall} />
             <UpcomingInvoices />
           </div>
         )}
@@ -116,7 +125,7 @@ const Cards = () => {
               <AlertDialogCancel>Cancelar</AlertDialogCancel>
               <AlertDialogAction
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                onClick={() => { if (deletingCard) deleteCard(deletingCard.id); setDeletingCard(null); }}
+                onClick={async () => { if (deletingCard) await deleteCard(deletingCard.id); setDeletingCard(null); refetchPeople(); }}
               >
                 <Trash2 className="w-4 h-4 mr-1" /> Excluir
               </AlertDialogAction>

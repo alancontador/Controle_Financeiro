@@ -1,0 +1,82 @@
+/**
+ * Pessoa como dimensao dos gastos. As pessoas vem dos cartoes (titular,
+ * adicionais); o que nao tem pessoa (lancamento manual sem atribuicao,
+ * recorrente) cai em "Casa/Comum" para a comparacao entre pessoas ficar
+ * honesta e o gasto da casa aparecer separado.
+ */
+
+export const COMMON_PERSON = 'Casa/Comum';
+
+export function personOf(t: { holder_name: string | null | undefined }): string {
+  const name = t.holder_name?.trim();
+  return name ? name : COMMON_PERSON;
+}
+
+export interface PersonTx {
+  holder_name: string | null;
+  amount: number;
+  type: 'income' | 'expense';
+  /** ISO aaaa-mm-dd */
+  date: string;
+  category_name?: string | null;
+}
+
+export interface PersonSummary {
+  person: string;
+  total: number;
+  /** Fatia do total de despesas do mes (0..1). */
+  share: number;
+  previousTotal?: number;
+  topCategories: { category: string; total: number }[];
+}
+
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
+/**
+ * Despesas do mes (aaaa-mm) somadas por pessoa, da maior para a menor, com
+ * fatia do total e as 3 maiores categorias de cada uma. Receitas ficam fora;
+ * estornos (valor negativo) reduzem.
+ */
+export function summarizeByPerson(
+  txs: PersonTx[],
+  month: string,
+  opts: { previousMonth?: string; topN?: number } = {},
+): PersonSummary[] {
+  const topN = opts.topN ?? 3;
+  const inMonth = (t: PersonTx, m: string) => t.type === 'expense' && t.date.slice(0, 7) === m;
+
+  const totals = new Map<string, number>();
+  const cats = new Map<string, Map<string, number>>();
+  for (const t of txs) {
+    if (!inMonth(t, month)) continue;
+    const p = personOf(t);
+    totals.set(p, (totals.get(p) ?? 0) + t.amount);
+    const c = t.category_name?.trim() || 'Sem categoria';
+    const byCat = cats.get(p) ?? new Map<string, number>();
+    byCat.set(c, (byCat.get(c) ?? 0) + t.amount);
+    cats.set(p, byCat);
+  }
+
+  const previous = new Map<string, number>();
+  if (opts.previousMonth) {
+    for (const t of txs) {
+      if (!inMonth(t, opts.previousMonth)) continue;
+      const p = personOf(t);
+      previous.set(p, (previous.get(p) ?? 0) + t.amount);
+    }
+  }
+
+  const grand = [...totals.values()].reduce((s, v) => s + v, 0);
+  return [...totals.entries()]
+    .map(([person, total]) => ({
+      person,
+      total: round2(total),
+      share: grand > 0 ? round2(total / grand) : 0,
+      ...(opts.previousMonth ? { previousTotal: round2(previous.get(person) ?? 0) } : {}),
+      topCategories: [...(cats.get(person) ?? new Map()).entries()]
+        .map(([category, t]) => ({ category, total: round2(t) }))
+        .sort((a, b) => b.total - a.total)
+        .slice(0, topN),
+    }))
+    .sort((a, b) => b.total - a.total);
+}

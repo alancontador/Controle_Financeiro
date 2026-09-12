@@ -13,8 +13,12 @@ const fmtMonth = (m: string) => MONTHS[Number(m.slice(5, 7)) - 1];
  * media ja esta comprometido com parcelas nos proximos 3 meses.
  */
 export function UpcomingInvoicesCard() {
-  const { projection, committedNext3, avgIncome3, loading } = useUpcomingInvoices(undefined, 3);
+  const { projection, byPerson, committedNext3, avgIncome3, loading } = useUpcomingInvoices(undefined, 3);
   const next = projection[0];
+  const nextByPerson = Object.entries(byPerson)
+    .map(([person, series]) => ({ person, total: series[0] ? series[0].committed + series[0].estimated : 0 }))
+    .filter((p) => p.total !== 0)
+    .sort((a, b) => b.total - a.total);
   const income3 = avgIncome3 * 3;
   const ratio = income3 > 0 ? committedNext3 / income3 : null;
   const pct = ratio === null ? 0 : Math.min(100, Math.round(ratio * 100));
@@ -54,6 +58,16 @@ export function UpcomingInvoicesCard() {
             <p className="text-sm text-muted-foreground">
               {fmt(next.committed)} em parcelas já assumidas · {fmt(next.estimated)} estimado em gastos recorrentes
             </p>
+            {nextByPerson.length > 0 && (
+              <ul className="mt-2 space-y-1">
+                {nextByPerson.map((p) => (
+                  <li key={p.person} className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">{p.person}</span>
+                    <span className="font-medium">{fmt(p.total)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
           <div>
             <div className="flex justify-between text-sm mb-1">
