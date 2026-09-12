@@ -9,6 +9,7 @@ import {
   type CategoryMemory,
 } from '@/lib/pdf/categorize';
 import type { BradescoHeader, BradescoItem } from '@/lib/pdf/bradesco';
+import type { CardKind, InvoiceCard } from '@/lib/cards/kinds';
 import type { CreditCard, Invoice } from '@/hooks/useCreditCards';
 
 export interface ImportableItem extends BradescoItem {
@@ -30,6 +31,8 @@ export interface ImportInput {
   /** Data de fechamento da fatura (define o periodo). */
   closingDate: string;
   categorization: Categorization;
+  /** Cartoes da fatura (pessoa + numero + tipo), ja revisados pelo usuario. */
+  cards: InvoiceCard[];
 }
 
 export type ImportOutcome =
@@ -116,15 +119,44 @@ export function useInvoiceImport() {
     return { options, suggest: (d) => suggestCategory(d, mem).category, idByName };
   }, [user]);
 
-  const ensureHolders = useCallback(async (cardId: string, names: string[]) => {
-    if (names.length === 0) return;
-    const { data: existing } = await supabase.from('card_holders').select('holder_name, is_primary').eq('card_id', cardId);
-    const have = new Set((existing ?? []).map((h) => h.holder_name.trim().toUpperCase()));
-    const hasPrimary = (existing ?? []).some((h) => h.is_primary);
-    const rows = names
-      .filter((n) => !have.has(n.trim().toUpperCase()))
-      .map((n, i) => ({ card_id: cardId, holder_name: n, is_primary: !hasPrimary && i === 0 }));
-    if (rows.length > 0) await supabase.from('card_holders').insert(rows);
+  /** Tipos ja escolhidos para os numeros deste cartao (lembrados em card_holders). */
+  const loadKnownKinds = useCallback(async (cardId: string): Promise<Map<string, CardKind>> => {
+    const { data } = await supabase.from('card_holders').select('last_four, kind').eq('card_id', cardId).not('last_four', 'is', null);
+    return new Map((data ?? []).filter((h) => h.last_four && h.kind).map((h) => [h.last_four as string, h.kind as CardKind]));
+  }, []);
+
+  /**
+   * Garante uma linha em card_holders por cartao da fatura (pessoa + numero +
+   * tipo). Linhas antigas so com o nome (cadastro manual) sao completadas com
+   * o numero do principal em vez de duplicadas.
+   */
+  const ensureHolders = useCallback(async (cardId: string, cards: InvoiceCard[]) => {
+    if (cards.length === 0) return;
+    const { data: existing } = await supabase.from('card_holders').select('id, holder_name, is_primary, last_four, kind').eq('card_id', cardId);
+    const rows = existing ?? [];
+    const norm = (n: string) => n.trim().toUpperCase().replace(/\s+/g, ' ');
+
+    for (const c of cards) {
+      const byNumber = rows.find((h) => h.last_four === c.lastFour);
+      if (byNumber) {
+        if (byNumber.kind !== c.kind || byNumber.holder_name !== c.holder) {
+          await supabase.from('card_holders').update({ kind: c.kind, holder_name: c.holder }).eq('id', byNumber.id);
+        }
+        continue;
+      }
+      const legacy = rows.find((h) => !h.last_four && norm(h.holder_name) === norm(c.holder));
+      if (legacy) {
+        await supabase.from('card_holders').update({ last_four: c.lastFour, kind: c.kind }).eq('id', legacy.id);
+        legacy.last_four = c.lastFour;
+        continue;
+      }
+      const { data: inserted } = await supabase
+        .from('card_holders')
+        .insert({ card_id: cardId, holder_name: c.holder, last_four: c.lastFour, kind: c.kind, is_primary: c.kind === 'principal' && !rows.some((h) => h.is_primary) })
+        .select('id, holder_name, is_primary, last_four, kind')
+        .single();
+      if (inserted) rows.push(inserted);
+    }
   }, []);
 
   /**
@@ -133,11 +165,13 @@ export function useInvoiceImport() {
    * quanto pela importacao dentro de uma fatura ja aberta.
    */
   const writeItems = useCallback(
-    async (invoiceId: string, items: ImportableItem[], categorization: Categorization): Promise<boolean> => {
+    async (invoiceId: string, items: ImportableItem[], categorization: Categorization, cards: InvoiceCard[]): Promise<boolean> => {
       if (!user) return false;
+      const kindByNumber = new Map(cards.map((c) => [c.lastFour, c.kind]));
       const rows = items.map((item) => ({
         invoice_id: invoiceId,
         ...item,
+        card_kind: item.card_last_four ? kindByNumber.get(item.card_last_four) ?? null : null,
         category_id: categorization.idByName.get(item.category) ?? null,
       }));
       const { data: inserted, error } = await supabase
@@ -174,7 +208,7 @@ export function useInvoiceImport() {
       const existing = await findExistingInvoice(input.cardId, input.closingDate);
       if (existing && !options.replace) return { status: 'duplicate', invoice: existing };
 
-      await ensureHolders(input.cardId, input.header.holders);
+      await ensureHolders(input.cardId, input.cards);
 
       let invoiceId: string;
       if (existing) {
@@ -199,7 +233,7 @@ export function useInvoiceImport() {
         invoiceId = data.id;
       }
 
-      const ok = await writeItems(invoiceId, input.items, input.categorization);
+      const ok = await writeItems(invoiceId, input.items, input.categorization, input.cards);
       if (!ok) return { status: 'error' };
 
       const total = input.items.reduce((s, i) => s + i.amount, 0) + input.previousBalance;
@@ -214,5 +248,5 @@ export function useInvoiceImport() {
     [user, findExistingInvoice, ensureHolders, writeItems, toast],
   );
 
-  return { findCardByLastFour, findExistingInvoice, loadCategorization, writeItems, importInvoice };
+  return { findCardByLastFour, findExistingInvoice, loadCategorization, loadKnownKinds, ensureHolders, writeItems, importInvoice };
 }

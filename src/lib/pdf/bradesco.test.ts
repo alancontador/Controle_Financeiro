@@ -73,16 +73,22 @@ describe('parseBradescoFatura', () => {
     expect(result.items).toHaveLength(7);
   });
 
-  it('atribui cada lancamento ao cartao do bloco em que aparece', () => {
-    const holders = result.items.map((i) => i.holder_name);
-    expect(holders).toEqual([
-      'Pagamentos',
-      'ANA SILVA (final 1111)',
-      'ANA SILVA (final 1111)',
-      'ANA SILVA (final 1111)',
-      'ANA SILVA (final 1111)',
-      'ANA SILVA (final 1111)',
-      'BRUNO COSTA (final 2222)',
+  it('atribui cada lancamento a pessoa e ao cartao do bloco em que aparece', () => {
+    expect(result.items.map((i) => [i.holder_name, i.card_last_four])).toEqual([
+      ['Pagamentos', null],
+      ['ANA SILVA', '1111'],
+      ['ANA SILVA', '1111'],
+      ['ANA SILVA', '1111'],
+      ['ANA SILVA', '1111'],
+      ['ANA SILVA', '1111'],
+      ['BRUNO COSTA', '2222'],
+    ]);
+  });
+
+  it('lista os cartoes da fatura na ordem dos blocos', () => {
+    expect(result.header.cards).toEqual([
+      { holder: 'ANA SILVA', lastFour: '1111' },
+      { holder: 'BRUNO COSTA', lastFour: '2222' },
     ]);
   });
 
@@ -135,8 +141,8 @@ describe('parseBradescoFatura', () => {
 
   it('confere a soma de cada cartao com o subtotal declarado na fatura', () => {
     expect(result.cardTotals).toEqual([
-      { holder: 'ANA SILVA (final 1111)', declared: 265.65, parsed: 265.65 },
-      { holder: 'BRUNO COSTA (final 2222)', declared: 1214.35, parsed: 1214.35 },
+      { holder: 'ANA SILVA', lastFour: '1111', declared: 265.65, parsed: 265.65 },
+      { holder: 'BRUNO COSTA', lastFour: '2222', declared: 1214.35, parsed: 1214.35 },
     ]);
   });
 
@@ -153,6 +159,10 @@ describe('parseBradescoFatura', () => {
       limit: 23200,
       closingDate: '2026-08-28',
       holders: ['ANA SILVA', 'BRUNO COSTA'],
+      cards: [
+        { holder: 'ANA SILVA', lastFour: '1111' },
+        { holder: 'BRUNO COSTA', lastFour: '2222' },
+      ],
     });
   });
 

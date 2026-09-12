@@ -13,6 +13,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useInvoices } from '@/hooks/useCreditCards';
 import { useInvoiceImport, type Categorization, type ImportableItem } from '@/hooks/useInvoiceImport';
 import { UpcomingInvoices } from '@/components/cards/UpcomingInvoices';
+import { CARD_KIND_LABEL, type CardKind, type InvoiceCard } from '@/lib/cards/kinds';
 import { AddItemModal } from '@/components/cards/AddItemModal';
 import { ImportExcelModal } from '@/components/cards/ImportExcelModal';
 import { ImportPdfModal } from '@/components/cards/ImportPdfModal';
@@ -35,11 +36,14 @@ const CardInvoices = () => {
   const [excelModalOpen, setExcelModalOpen] = useState(false);
   const [pdfModalOpen, setPdfModalOpen] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
-  const { loadCategorization, writeItems } = useInvoiceImport();
+  const { loadCategorization, loadKnownKinds, ensureHolders, writeItems } = useInvoiceImport();
   const [categorization, setCategorization] = useState<Categorization | null>(null);
+  const [knownKinds, setKnownKinds] = useState<Map<string, CardKind>>(new Map());
 
   const openPdfModal = async () => {
-    setCategorization(await loadCategorization());
+    const [cat, kinds] = await Promise.all([loadCategorization(), loadKnownKinds(cardId || '')]);
+    setCategorization(cat);
+    setKnownKinds(kinds);
     setPdfModalOpen(true);
   };
 
@@ -100,12 +104,20 @@ const CardInvoices = () => {
     }
   };
 
-  // Group items by holder
-  const grouped = items.reduce<Record<string, typeof items>>((acc, item) => {
-    if (!acc[item.holder_name]) acc[item.holder_name] = [];
-    acc[item.holder_name].push(item);
-    return acc;
-  }, {});
+  // Pessoa -> cartao (numero) -> lancamentos. Itens sem numero (pagamentos ou
+  // lancamentos manuais) ficam direto na pessoa.
+  const people: { name: string; cards: { lastFour: string; kind: CardKind | null; items: typeof items }[] }[] = [];
+  for (const item of items) {
+    let person = people.find(p => p.name === item.holder_name);
+    if (!person) { person = { name: item.holder_name, cards: [] }; people.push(person); }
+    const key = item.card_last_four ?? '';
+    let cardGroup = person.cards.find(c => c.lastFour === key);
+    if (!cardGroup) { cardGroup = { lastFour: key, kind: item.card_kind, items: [] }; person.cards.push(cardGroup); }
+    cardGroup.items.push(item);
+  }
+  const grouped = Object.fromEntries(people.map(p => [p.name, p.cards.flatMap(c => c.items)]));
+  // card_holders tem uma linha por cartao; os modais de lancamento manual querem pessoas.
+  const uniqueHolders = holders.filter((h, i, arr) => arr.findIndex(o => o.holder_name === h.holder_name) === i);
 
   const openInvoiceTotal = invoices
     .filter(i => i.status === 'OPEN')
@@ -120,9 +132,10 @@ const CardInvoices = () => {
     if (selectedInvoiceId) await addItemsBatch(selectedInvoiceId, importItems);
   };
 
-  const handlePdfImport = async (importItems: ImportableItem[], prevBalance: number) => {
-    if (!selectedInvoiceId || !categorization) return;
-    const ok = await writeItems(selectedInvoiceId, importItems, categorization);
+  const handlePdfImport = async (importItems: ImportableItem[], prevBalance: number, cards: InvoiceCard[]) => {
+    if (!selectedInvoiceId || !categorization || !cardId) return;
+    await ensureHolders(cardId, cards);
+    const ok = await writeItems(selectedInvoiceId, importItems, categorization, cards);
     if (!ok) return;
     if (prevBalance > 0) await updatePreviousBalance(selectedInvoiceId, prevBalance);
     await fetchItems(selectedInvoiceId);
@@ -248,38 +261,58 @@ const CardInvoices = () => {
                     <p className="text-center text-muted-foreground py-8">Nenhum lançamento nesta fatura.</p>
                   ) : (
                     <>
-                      {Object.entries(grouped).map(([holder, hItems]) => {
-                        const holderTotal = hItems.reduce((s, i) => s + Number(i.amount), 0);
+                      {people.map(person => {
+                        const personTotal = person.cards.reduce((t, c) => t + c.items.reduce((u, i) => u + Number(i.amount), 0), 0);
                         return (
-                          <div key={holder} className="mb-6">
-                            <h3 className="font-semibold text-foreground mb-2">{holder}</h3>
-                            <Table>
-                              <TableHeader>
-                                <TableRow>
-                                  <TableHead>Data</TableHead>
-                                  <TableHead>Descrição</TableHead>
-                                  <TableHead>Parcela</TableHead>
-                                  <TableHead className="text-right">Valor</TableHead>
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {hItems.map(item => (
-                                  <TableRow key={item.id}>
-                                    <TableCell>{fmtDateShort(item.transaction_date)}</TableCell>
-                                    <TableCell>{item.description}</TableCell>
-                                    <TableCell>
-                                      {item.installment_current && item.installment_total
-                                        ? `${item.installment_current}/${item.installment_total}`
-                                        : '-'}
-                                    </TableCell>
-                                    <TableCell className="text-right">{fmt(Number(item.amount))}</TableCell>
-                                  </TableRow>
-                                ))}
-                              </TableBody>
-                            </Table>
-                            <p className="text-sm font-medium text-right mt-1 text-foreground">
-                              Total {holder}: {fmt(holderTotal)}
-                            </p>
+                          <div key={person.name} className="mb-8">
+                            <div className="flex items-center justify-between mb-2">
+                              <h3 className="font-semibold text-foreground text-base">{person.name}</h3>
+                              {person.cards.length > 1 && (
+                                <span className="text-sm text-muted-foreground">
+                                  Total {person.name}: <span className="font-medium text-foreground">{fmt(personTotal)}</span>
+                                </span>
+                              )}
+                            </div>
+                            {person.cards.map(cardGroup => {
+                              const cardTotal = cardGroup.items.reduce((t, i) => t + Number(i.amount), 0);
+                              const label = cardGroup.lastFour
+                                ? `${cardGroup.kind ? CARD_KIND_LABEL[cardGroup.kind] : 'Cartão'} •••• ${cardGroup.lastFour}`
+                                : null;
+                              return (
+                                <div key={cardGroup.lastFour || 'sem-cartao'} className="mb-4 rounded-lg border border-border/60 p-3">
+                                  {label && <p className="text-sm font-medium mb-2">{label}</p>}
+                                  <Table>
+                                    <TableHeader>
+                                      <TableRow>
+                                        <TableHead>Data</TableHead>
+                                        <TableHead>Descrição</TableHead>
+                                        <TableHead>Categoria</TableHead>
+                                        <TableHead>Parcela</TableHead>
+                                        <TableHead className="text-right">Valor</TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {cardGroup.items.map(item => (
+                                        <TableRow key={item.id}>
+                                          <TableCell className="whitespace-nowrap">{fmtDateShort(item.transaction_date)}</TableCell>
+                                          <TableCell>{item.description}</TableCell>
+                                          <TableCell className="text-muted-foreground">{item.category}</TableCell>
+                                          <TableCell>
+                                            {item.installment_current && item.installment_total
+                                              ? `${item.installment_current}/${item.installment_total}`
+                                              : '-'}
+                                          </TableCell>
+                                          <TableCell className={`text-right whitespace-nowrap ${Number(item.amount) < 0 ? 'text-emerald-600' : ''}`}>{fmt(Number(item.amount))}</TableCell>
+                                        </TableRow>
+                                      ))}
+                                    </TableBody>
+                                  </Table>
+                                  <p className="text-sm font-medium text-right mt-1 text-foreground">
+                                    {label ?? person.name}: {fmt(cardTotal)}
+                                  </p>
+                                </div>
+                              );
+                            })}
                           </div>
                         );
                       })}
@@ -307,13 +340,13 @@ const CardInvoices = () => {
           open={addModalOpen}
           onClose={() => setAddModalOpen(false)}
           onSave={handleAddItem}
-          holders={holders}
+          holders={uniqueHolders}
         />
         <ImportExcelModal
           open={excelModalOpen}
           onClose={() => setExcelModalOpen(false)}
           onConfirm={handleExcelImport}
-          holders={holders}
+          holders={uniqueHolders}
         />
         <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
           <AlertDialogContent>
@@ -346,6 +379,7 @@ const CardInvoices = () => {
           open={pdfModalOpen}
           categoryOptions={categorization?.options}
           suggest={categorization?.suggest}
+          knownKinds={knownKinds}
           onClose={() => setPdfModalOpen(false)}
           onConfirm={handlePdfImport}
         />

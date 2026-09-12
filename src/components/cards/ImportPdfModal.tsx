@@ -8,6 +8,7 @@ import { Upload, AlertCircle, CheckCircle2, XCircle } from 'lucide-react';
 import { extractPdfLines } from '@/lib/pdf/extractText';
 import { parseBradescoFatura, type BradescoItem, type BradescoParseResult } from '@/lib/pdf/bradesco';
 import { CARD_CATEGORIES } from '@/lib/pdf/autoCategory';
+import { CARD_KINDS, CARD_KIND_LABEL, classifyInvoiceCards, type CardKind, type InvoiceCard } from '@/lib/cards/kinds';
 
 /** Item no formato que a tabela invoice_items espera. */
 export type ImportedInvoiceItem = BradescoItem & { is_previous_balance: boolean };
@@ -15,21 +16,24 @@ export type ImportedInvoiceItem = BradescoItem & { is_previous_balance: boolean 
 interface Props {
   open: boolean;
   onClose: () => void;
-  onConfirm: (items: ImportedInvoiceItem[], previousBalance: number) => void | Promise<void>;
+  onConfirm: (items: ImportedInvoiceItem[], previousBalance: number, cards: InvoiceCard[]) => void | Promise<void>;
   /** Resultado ja lido (fluxo da aba Cartoes): pula a escolha do arquivo e vai direto para a revisao. */
   parsed?: BradescoParseResult | null;
   /** Lista de categorias oferecida na revisao. Padrao: a lista fixa do cartao. */
   categoryOptions?: string[];
   /** Sugestao de categoria por descricao (memoria + regras). Se ausente, fica a do parser. */
   suggest?: (description: string) => string;
+  /** Tipos de cartao ja escolhidos antes, por numero (lembrados em card_holders). */
+  knownKinds?: ReadonlyMap<string, CardKind>;
 }
 
 type Conferencia = Pick<BradescoParseResult, 'totalFatura' | 'parsedTotal' | 'cardTotals' | 'dueDate'>;
 
 const sameCents = (a: number, b: number) => Math.abs(a - b) < 0.005;
 
-export function ImportPdfModal({ open, onClose, onConfirm, parsed, categoryOptions, suggest }: Props) {
+export function ImportPdfModal({ open, onClose, onConfirm, parsed, categoryOptions, suggest, knownKinds }: Props) {
   const [items, setItems] = useState<BradescoItem[]>([]);
+  const [cards, setCards] = useState<InvoiceCard[]>([]);
   const [previousBalance, setPreviousBalance] = useState(0);
   const [conferencia, setConferencia] = useState<Conferencia | null>(null);
   const [error, setError] = useState('');
@@ -38,6 +42,7 @@ export function ImportPdfModal({ open, onClose, onConfirm, parsed, categoryOptio
 
   const reset = () => {
     setItems([]);
+    setCards([]);
     setPreviousBalance(0);
     setConferencia(null);
     setError('');
@@ -45,6 +50,7 @@ export function ImportPdfModal({ open, onClose, onConfirm, parsed, categoryOptio
 
   const applyResult = (result: BradescoParseResult) => {
     setItems(suggest ? result.items.map((i) => ({ ...i, category: suggest(i.description) })) : result.items);
+    setCards(classifyInvoiceCards(result.header, knownKinds));
     setPreviousBalance(result.previousBalance);
     setConferencia(result);
   };
@@ -87,12 +93,16 @@ export function ImportPdfModal({ open, onClose, onConfirm, parsed, categoryOptio
     setItems(prev => prev.map((item, i) => i === index ? { ...item, description } : item));
   };
 
+  const updateCardKind = (lastFour: string, kind: CardKind) => {
+    setCards(prev => prev.map(c => c.lastFour === lastFour ? { ...c, kind } : c));
+  };
+
   const handleConfirm = async () => {
     const mapped: ImportedInvoiceItem[] = items.map(item => ({ ...item, is_previous_balance: false }));
     setLoading(true);
     try {
       // Espera a gravacao terminar antes de fechar, para o erro (se houver) aparecer com o modal aberto.
-      await onConfirm(mapped, previousBalance);
+      await onConfirm(mapped, previousBalance, cards);
     } finally {
       setLoading(false);
     }
@@ -107,12 +117,18 @@ export function ImportPdfModal({ open, onClose, onConfirm, parsed, categoryOptio
     return `${day}/${m}/${y}`;
   };
 
-  // Group by holder
-  const grouped = items.reduce<Record<string, BradescoItem[]>>((acc, item) => {
-    if (!acc[item.holder_name]) acc[item.holder_name] = [];
-    acc[item.holder_name].push(item);
-    return acc;
-  }, {});
+  // Pessoa -> cartao (numero) -> lancamentos, na ordem em que aparecem na fatura.
+  // Lancamentos fora de bloco de cartao (pagamentos) ficam na pessoa, sem cartao.
+  const people: { name: string; cards: { lastFour: string; items: BradescoItem[] }[] }[] = [];
+  for (const item of items) {
+    let person = people.find(p => p.name === item.holder_name);
+    if (!person) { person = { name: item.holder_name, cards: [] }; people.push(person); }
+    const key = item.card_last_four ?? '';
+    let card = person.cards.find(c => c.lastFour === key);
+    if (!card) { card = { lastFour: key, items: [] }; person.cards.push(card); }
+    card.items.push(item);
+  }
+  const kindOf = (lastFour: string) => cards.find(c => c.lastFour === lastFour)?.kind;
 
   const total = items.reduce((s, i) => s + i.amount, 0) + previousBalance;
   const totalOk = conferencia?.totalFatura !== undefined && sameCents(conferencia.parsedTotal, conferencia.totalFatura);
@@ -155,11 +171,11 @@ export function ImportPdfModal({ open, onClose, onConfirm, parsed, categoryOptio
                   {conferencia.dueDate && <li>Vencimento: {fmtDate(conferencia.dueDate)}</li>}
                   {previousBalance > 0 && <li>Saldo anterior: {fmt(previousBalance)}</li>}
                   {conferencia.cardTotals.map(c => (
-                    <li key={c.holder} className="flex items-center gap-1">
+                    <li key={`${c.holder}-${c.lastFour}`} className="flex items-center gap-1">
                       {sameCents(c.declared, c.parsed)
                         ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                         : <XCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />}
-                      {c.holder}: lido {fmt(c.parsed)} · fatura {fmt(c.declared)}
+                      {c.holder} •••• {c.lastFour}: lido {fmt(c.parsed)} · fatura {fmt(c.declared)}
                     </li>
                   ))}
                   {conferencia.totalFatura !== undefined && (
@@ -174,55 +190,82 @@ export function ImportPdfModal({ open, onClose, onConfirm, parsed, categoryOptio
               </div>
             )}
 
-            {Object.entries(grouped).map(([holder, hItems]) => {
-              const holderTotal = hItems.reduce((s, i) => s + i.amount, 0);
-              const startIndex = items.indexOf(hItems[0]);
+            {people.map(person => {
+              const personTotal = person.cards.reduce((s, c) => s + c.items.reduce((t, i) => t + i.amount, 0), 0);
               return (
-                <div key={holder} className="mb-6">
-                  <h3 className="font-semibold text-foreground mb-2">{holder}</h3>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Data</TableHead>
-                        <TableHead>Descrição</TableHead>
-                        <TableHead>Parcela</TableHead>
-                        <TableHead className="text-right">Valor</TableHead>
-                        <TableHead>Categoria</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {hItems.map((item, idx) => {
-                        const globalIdx = startIndex + idx;
-                        return (
-                          <TableRow key={idx}>
-                            <TableCell className="whitespace-nowrap">{fmtDate(item.transaction_date)}</TableCell>
-                            <TableCell>
-                              <Input
-                                value={item.description}
-                                onChange={e => updateItemDesc(globalIdx, e.target.value)}
-                                className="h-8 text-sm"
-                              />
-                            </TableCell>
-                            <TableCell>
-                              {item.installment_current && item.installment_total
-                                ? `${item.installment_current}/${item.installment_total}`
-                                : '-'}
-                            </TableCell>
-                            <TableCell className={`text-right whitespace-nowrap ${item.amount < 0 ? 'text-emerald-600' : ''}`}>{fmt(item.amount)}</TableCell>
-                            <TableCell>
-                              <Select value={item.category} onValueChange={v => updateItemCategory(globalIdx, v)}>
-                                <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                  {(categoryOptions ?? CARD_CATEGORIES).map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                                </SelectContent>
-                              </Select>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                  <p className="text-sm font-medium text-right mt-1">Total {holder}: {fmt(holderTotal)}</p>
+                <div key={person.name} className="mb-8">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="font-semibold text-foreground text-base">{person.name}</h3>
+                    {person.cards.length > 1 && (
+                      <span className="text-sm text-muted-foreground">Total {person.name}: <span className="font-medium text-foreground">{fmt(personTotal)}</span></span>
+                    )}
+                  </div>
+                  {person.cards.map(card => {
+                    const cardTotal = card.items.reduce((s, i) => s + i.amount, 0);
+                    const startIndex = items.indexOf(card.items[0]);
+                    const kind = kindOf(card.lastFour);
+                    return (
+                      <div key={card.lastFour || 'sem-cartao'} className="mb-4 rounded-lg border border-border/60 p-3">
+                        {card.lastFour && (
+                          <div className="flex flex-wrap items-center gap-3 mb-2">
+                            <span className="text-sm font-medium">•••• {card.lastFour}</span>
+                            <Select value={kind ?? 'principal'} onValueChange={v => updateCardKind(card.lastFour, v as CardKind)}>
+                              <SelectTrigger className="h-8 text-sm w-[220px]"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                {CARD_KINDS.map(k => <SelectItem key={k} value={k}>{CARD_KIND_LABEL[k]}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                            <span className="text-xs text-muted-foreground">tipo inferido da fatura — ajuste se precisar; fica lembrado por número</span>
+                          </div>
+                        )}
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Data</TableHead>
+                              <TableHead>Descrição</TableHead>
+                              <TableHead>Parcela</TableHead>
+                              <TableHead className="text-right">Valor</TableHead>
+                              <TableHead>Categoria</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {card.items.map((item, idx) => {
+                              const globalIdx = startIndex + idx;
+                              return (
+                                <TableRow key={idx}>
+                                  <TableCell className="whitespace-nowrap">{fmtDate(item.transaction_date)}</TableCell>
+                                  <TableCell>
+                                    <Input
+                                      value={item.description}
+                                      onChange={e => updateItemDesc(globalIdx, e.target.value)}
+                                      className="h-8 text-sm"
+                                    />
+                                  </TableCell>
+                                  <TableCell>
+                                    {item.installment_current && item.installment_total
+                                      ? `${item.installment_current}/${item.installment_total}`
+                                      : '-'}
+                                  </TableCell>
+                                  <TableCell className={`text-right whitespace-nowrap ${item.amount < 0 ? 'text-emerald-600' : ''}`}>{fmt(item.amount)}</TableCell>
+                                  <TableCell>
+                                    <Select value={item.category} onValueChange={v => updateItemCategory(globalIdx, v)}>
+                                      <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                                      <SelectContent>
+                                        {(categoryOptions ?? CARD_CATEGORIES).map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                                      </SelectContent>
+                                    </Select>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                        <p className="text-sm font-medium text-right mt-1">
+                          {card.lastFour ? `${CARD_KIND_LABEL[kind ?? 'principal']} •••• ${card.lastFour}` : person.name}: {fmt(cardTotal)}
+                        </p>
+                      </div>
+                    );
+                  })}
                 </div>
               );
             })}

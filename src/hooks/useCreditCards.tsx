@@ -21,6 +21,9 @@ export interface CardHolder {
   card_id: string;
   holder_name: string;
   is_primary: boolean;
+  /** Final do numero deste cartao (principal, virtual ou adicional). Null em cadastros antigos. */
+  last_four: string | null;
+  kind: 'principal' | 'adicional' | 'virtual' | null;
   created_at: string;
 }
 
@@ -39,6 +42,8 @@ export interface InvoiceItem {
   id: string;
   invoice_id: string;
   holder_name: string;
+  card_last_four: string | null;
+  card_kind: 'principal' | 'adicional' | 'virtual' | null;
   transaction_date: string;
   description: string;
   amount: number;

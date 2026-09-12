@@ -59,6 +59,8 @@ export type Database = {
           holder_name: string
           id: string
           is_primary: boolean
+          last_four: string | null
+          kind: string | null
         }
         Insert: {
           card_id: string
@@ -66,6 +68,8 @@ export type Database = {
           holder_name: string
           id?: string
           is_primary?: boolean
+          last_four?: string | null
+          kind?: string | null
         }
         Update: {
           card_id?: string
@@ -73,6 +77,8 @@ export type Database = {
           holder_name?: string
           id?: string
           is_primary?: boolean
+          last_four?: string | null
+          kind?: string | null
         }
         Relationships: [
           {
@@ -362,6 +368,8 @@ export type Database = {
           is_previous_balance: boolean
           transaction_date: string
           category_id: string | null
+          card_last_four: string | null
+          card_kind: string | null
         }
         Insert: {
           amount: number
@@ -376,6 +384,8 @@ export type Database = {
           is_previous_balance?: boolean
           transaction_date: string
           category_id?: string | null
+          card_last_four?: string | null
+          card_kind?: string | null
         }
         Update: {
           amount?: number
@@ -390,6 +400,8 @@ export type Database = {
           is_previous_balance?: boolean
           transaction_date?: string
           category_id?: string | null
+          card_last_four?: string | null
+          card_kind?: string | null
         }
         Relationships: [
           {

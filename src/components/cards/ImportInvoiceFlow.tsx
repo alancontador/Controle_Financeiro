@@ -12,6 +12,7 @@ import { parseBradescoFatura, type BradescoParseResult } from '@/lib/pdf/bradesc
 import { CardModal, type CardFormData } from '@/components/cards/CardModal';
 import { ImportPdfModal, type ImportedInvoiceItem } from '@/components/cards/ImportPdfModal';
 import { useInvoiceImport, type Categorization } from '@/hooks/useInvoiceImport';
+import type { CardKind, InvoiceCard } from '@/lib/cards/kinds';
 import type { CreditCard, Invoice } from '@/hooks/useCreditCards';
 
 interface Props {
@@ -44,12 +45,13 @@ function cardFromHeader(parsed: BradescoParseResult): Partial<CardFormData> {
  */
 export function ImportInvoiceFlow({ cards, createCard, onImported }: Props) {
   const { toast } = useToast();
-  const { findCardByLastFour, findExistingInvoice, importInvoice, loadCategorization } = useInvoiceImport();
+  const { findCardByLastFour, findExistingInvoice, importInvoice, loadCategorization, loadKnownKinds } = useInvoiceImport();
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [busy, setBusy] = useState(false);
   const [parsed, setParsed] = useState<BradescoParseResult | null>(null);
   const [categorization, setCategorization] = useState<Categorization | null>(null);
+  const [knownKinds, setKnownKinds] = useState<Map<string, CardKind>>(new Map());
   const [cardId, setCardId] = useState<string | null>(null);
   const [cardModalOpen, setCardModalOpen] = useState(false);
   const [duplicate, setDuplicate] = useState<Invoice | null>(null);
@@ -64,6 +66,7 @@ export function ImportInvoiceFlow({ cards, createCard, onImported }: Props) {
     replacingRef.current = false;
     setParsed(null);
     setCategorization(null);
+    setKnownKinds(new Map());
     setCardId(null);
     setCardModalOpen(false);
     setDuplicate(null);
@@ -123,6 +126,7 @@ export function ImportInvoiceFlow({ cards, createCard, onImported }: Props) {
   /** Com o cartao resolvido: checa duplicidade e abre a revisao. */
   const continueWithCard = async (id: string, result: BradescoParseResult) => {
     setCardId(id);
+    setKnownKinds(await loadKnownKinds(id));
     const existing = await findExistingInvoice(id, result.header.closingDate!);
     if (existing) {
       setDuplicate(existing);
@@ -131,11 +135,11 @@ export function ImportInvoiceFlow({ cards, createCard, onImported }: Props) {
     }
   };
 
-  const handleConfirm = async (items: ImportedInvoiceItem[], previousBalance: number) => {
+  const handleConfirm = async (items: ImportedInvoiceItem[], previousBalance: number, cards: InvoiceCard[]) => {
     if (!parsed || !cardId || !categorization) return;
     setBusy(true);
     const outcome = await importInvoice(
-      { cardId, header: parsed.header, items, previousBalance, closingDate: parsed.header.closingDate!, categorization },
+      { cardId, header: parsed.header, items, previousBalance, closingDate: parsed.header.closingDate!, categorization, cards },
       { replace },
     );
     setBusy(false);
@@ -189,6 +193,7 @@ export function ImportInvoiceFlow({ cards, createCard, onImported }: Props) {
         parsed={parsed}
         categoryOptions={categorization?.options}
         suggest={categorization?.suggest}
+        knownKinds={knownKinds}
         onClose={resetAll}
         onConfirm={handleConfirm}
       />

@@ -13,7 +13,10 @@ import type { PdfLine, PdfTextItem } from './types';
  */
 
 export interface BradescoItem {
+  /** Pessoa (titular ou adicional) do bloco em que o lancamento aparece; "Pagamentos" fora de bloco. */
   holder_name: string;
+  /** Final do cartao do bloco (principal, virtual ou adicional); null fora de bloco. */
+  card_last_four: string | null;
   /** Data ISO (aaaa-mm-dd). */
   transaction_date: string;
   description: string;
@@ -26,6 +29,7 @@ export interface BradescoItem {
 
 export interface CardTotal {
   holder: string;
+  lastFour: string;
   /** Subtotal que a fatura declara na linha "Total para <titular>". */
   declared: number;
   /** Soma dos lancamentos que o parser encontrou nesse bloco. */
@@ -45,8 +49,10 @@ export interface BradescoHeader {
   limit?: number;
   /** Data de fechamento desta fatura, ISO. */
   closingDate?: string;
-  /** Nomes dos titulares, na ordem dos blocos. */
+  /** Nomes das pessoas, sem repeticao, na ordem dos blocos. */
   holders: string[];
+  /** Cada bloco de cartao da fatura: pessoa + final do numero, na ordem. */
+  cards: { holder: string; lastFour: string }[];
 }
 
 export interface BradescoParseResult {
@@ -117,11 +123,12 @@ export function parseBradescoFatura(lines: PdfLine[], today: Date = new Date()):
   let dueDate: string | undefined;
 
   let currentHolder = HOLDER_OUTSIDE_CARD;
+  let currentLastFour: string | null = null;
   let inCardBlock = false;
   let cardSum = 0;
   let parsedTotal = 0;
 
-  const header: BradescoHeader = { bank: 'Bradesco', brand: 'Outro', holders: [] };
+  const header: BradescoHeader = { bank: 'Bradesco', brand: 'Outro', holders: [], cards: [] };
   let nextClosing: string | undefined;
 
   // O ano so pode ser resolvido depois de ler o vencimento (pagina 1), mas os
@@ -200,11 +207,12 @@ export function parseBradescoFatura(lines: PdfLine[], today: Date = new Date()):
 
     const cardTotal = joinText(leftItems(line)).match(RE_CARD_TOTAL);
     if (cardTotal) {
-      if (inCardBlock) {
-        cardTotals.push({ holder: currentHolder, declared: parseMoney(cardTotal[2]), parsed: round2(cardSum) });
+      if (inCardBlock && currentLastFour) {
+        cardTotals.push({ holder: currentHolder, lastFour: currentLastFour, declared: parseMoney(cardTotal[2]), parsed: round2(cardSum) });
       }
       inCardBlock = false;
       currentHolder = HOLDER_OUTSIDE_CARD;
+      currentLastFour = null;
       continue;
     }
 
@@ -212,7 +220,9 @@ export function parseBradescoFatura(lines: PdfLine[], today: Date = new Date()):
     if (cardHeader && !RE_CARD_NUMBER_LABEL.test(text)) {
       const name = cardHeader[1].trim();
       if (!header.holders.includes(name)) header.holders.push(name);
-      currentHolder = `${name} (final ${cardHeader[2]})`;
+      header.cards.push({ holder: name, lastFour: cardHeader[2] });
+      currentHolder = name;
+      currentLastFour = cardHeader[2];
       inCardBlock = true;
       cardSum = 0;
       continue;
@@ -225,6 +235,7 @@ export function parseBradescoFatura(lines: PdfLine[], today: Date = new Date()):
     const month = Number(mm);
     items.push({
       holder_name: currentHolder,
+      card_last_four: currentLastFour,
       transaction_date: `${yearFor(month)}-${mm}-${dd}`,
       description: tx.description,
       amount: tx.amount,
