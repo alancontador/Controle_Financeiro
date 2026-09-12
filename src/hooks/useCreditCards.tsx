@@ -5,6 +5,36 @@ import { useToast } from '@/hooks/use-toast';
 import { computeCardUsage, type CardUsage } from '@/lib/cards/usage';
 import { itemToTransaction, MIRROR_NOTE } from '@/lib/cards/mirror';
 import type { Share } from '@/lib/cards/split';
+import { attributionKeys, fractionsFromShares } from '@/lib/cards/attribution';
+import type { Json } from '@/integrations/supabase/types';
+
+/** Grava (ou apaga, com null) a decisao de atribuicao de uma compra nos dois niveis: compra exata e descricao no cartao. */
+async function rememberAttribution(
+  item: { holder_name: string; card_last_four: string | null; transaction_date: string; description: string; amount: number; installment_total: number | null },
+  value: { assigned_to?: string | null; shares?: Share[] } | null,
+) {
+  if (!item.card_last_four) return;
+  const { data: auth } = await supabase.auth.getUser();
+  const userId = auth.user?.id;
+  if (!userId) return;
+  const keys = attributionKeys({ ...item, amount: Number(item.amount) });
+  const list = [keys.purchase, keys.description];
+  if (!value) {
+    await supabase.from('attribution_memory').delete().eq('user_id', userId).in('key', list);
+    return;
+  }
+  const shares = value.shares && value.shares.length >= 2 ? fractionsFromShares(Number(item.amount), value.shares) : null;
+  await supabase.from('attribution_memory').upsert(
+    list.map((key) => ({
+      user_id: userId,
+      key,
+      assigned_to: shares ? null : value.assigned_to ?? null,
+      shares: shares ? (JSON.parse(JSON.stringify(shares)) as Json) : null,
+      updated_at: new Date().toISOString(),
+    })),
+    { onConflict: 'user_id,key' },
+  );
+}
 
 export interface CreditCard {
   id: string;
@@ -248,6 +278,7 @@ export function useInvoices(cardId: string) {
       await supabase.from('transactions').insert(rows);
     }
 
+    await rememberAttribution(item, shares.length > 0 ? { shares } : null);
     setSplits((prev) => {
       const next = { ...prev };
       if (shares.length > 0) next[item.id] = shares; else delete next[item.id];
@@ -330,6 +361,7 @@ export function useInvoices(cardId: string) {
       return false;
     }
     await supabase.from('transactions').update({ holder_name: assigned ?? item.holder_name }).eq('invoice_item_id', item.id);
+    await rememberAttribution(item, assigned ? { assigned_to: assigned } : null);
     setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, assigned_to: assigned } : i)));
     toast({ title: assigned ? `Realocado para ${assigned}` : `De volta para ${item.holder_name}` });
     return true;

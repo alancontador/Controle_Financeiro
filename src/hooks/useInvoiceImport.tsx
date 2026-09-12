@@ -10,6 +10,8 @@ import {
 } from '@/lib/pdf/categorize';
 import type { BradescoHeader, BradescoItem } from '@/lib/pdf/bradesco';
 import type { CardKind, InvoiceCard } from '@/lib/cards/kinds';
+import { attributionKeys, resolveAttribution, sharesFromFractions, type Attribution, type AttributionMemory } from '@/lib/cards/attribution';
+import { MIRROR_NOTE } from '@/lib/cards/mirror';
 import type { CreditCard, Invoice } from '@/hooks/useCreditCards';
 
 export interface ImportableItem extends BradescoItem {
@@ -35,6 +37,8 @@ export interface ImportInput {
   categorization: Categorization;
   /** Cartoes da fatura (pessoa + numero + tipo), ja revisados pelo usuario. */
   cards: InvoiceCard[];
+  /** Realocacoes/divisoes lembradas, para reaplicar. */
+  attribution?: AttributionMemory;
 }
 
 export type ImportOutcome =
@@ -127,6 +131,13 @@ export function useInvoiceImport() {
     return { options, suggest: (d) => suggestCategory(d, mem).category, idByName };
   }, [user]);
 
+  /** Realocacoes e divisoes que o usuario ja fez (por compra exata e por descricao no cartao). */
+  const loadAttribution = useCallback(async (): Promise<AttributionMemory> => {
+    if (!user) return new Map();
+    const { data } = await supabase.from('attribution_memory').select('key, assigned_to, shares').eq('user_id', user.id).limit(5000);
+    return new Map((data ?? []).map((r) => [r.key, { assigned_to: r.assigned_to, shares: (r.shares as unknown as Attribution['shares']) ?? undefined }]));
+  }, [user]);
+
   /** Tipos ja escolhidos para os numeros deste cartao (lembrados em card_holders). */
   const loadKnownKinds = useCallback(async (cardId: string): Promise<Map<string, CardKind>> => {
     const { data } = await supabase.from('card_holders').select('last_four, kind').eq('card_id', cardId).not('last_four', 'is', null);
@@ -173,15 +184,41 @@ export function useInvoiceImport() {
    * quanto pela importacao dentro de uma fatura ja aberta.
    */
   const writeItems = useCallback(
-    async (invoiceId: string, items: ImportableItem[], categorization: Categorization, cards: InvoiceCard[]): Promise<boolean> => {
+    async (
+      invoiceId: string,
+      items: ImportableItem[],
+      categorization: Categorization,
+      cards: InvoiceCard[],
+      attribution: AttributionMemory = new Map(),
+    ): Promise<boolean> => {
       if (!user) return false;
       const kindByNumber = new Map(cards.map((c) => [c.lastFour, c.kind]));
-      const rows = items.map((item) => ({
-        invoice_id: invoiceId,
-        ...item,
-        card_kind: item.card_last_four ? kindByNumber.get(item.card_last_four) ?? null : null,
-        category_id: categorization.idByName.get(item.category) ?? null,
-      }));
+
+      // Reaplica realocacoes e divisoes lembradas. O que o usuario escolheu na
+      // revisao (assigned_to) vence a memoria e e gravado nela.
+      const plannedSplits = new Map<number, ReturnType<typeof sharesFromFractions>>();
+      const memoryUpserts: { key: string; assigned_to: string | null }[] = [];
+      const rows = items.map((item, idx) => {
+        let assigned = item.assigned_to ?? null;
+        if (item.card_last_four) {
+          const remembered = resolveAttribution(item, attribution);
+          if (assigned) {
+            const keys = attributionKeys(item);
+            memoryUpserts.push({ key: keys.purchase, assigned_to: assigned }, { key: keys.description, assigned_to: assigned });
+          } else if (remembered?.shares) {
+            plannedSplits.set(idx, sharesFromFractions(item.amount, remembered.shares));
+          } else if (remembered?.assigned_to) {
+            assigned = remembered.assigned_to;
+          }
+        }
+        return {
+          invoice_id: invoiceId,
+          ...item,
+          assigned_to: assigned,
+          card_kind: item.card_last_four ? kindByNumber.get(item.card_last_four) ?? null : null,
+          category_id: categorization.idByName.get(item.category) ?? null,
+        };
+      });
       const { data: inserted, error } = await supabase
         .from('invoice_items')
         .insert(rows)
@@ -189,6 +226,28 @@ export function useInvoiceImport() {
       if (error) {
         toast({ title: 'Erro ao gravar os lançamentos', description: error.message, variant: 'destructive' });
         return false;
+      }
+      if (memoryUpserts.length > 0) {
+        await supabase.from('attribution_memory').upsert(
+          memoryUpserts.map((m) => ({ user_id: user.id, key: m.key, assigned_to: m.assigned_to, shares: null, updated_at: new Date().toISOString() })),
+          { onConflict: 'user_id,key' },
+        );
+      }
+
+      // Divisoes lembradas: casa cada linha gravada com a de origem (mesma ordem; confere pela descricao/valor).
+      const splitByRowId = new Map<string, ReturnType<typeof sharesFromFractions>>();
+      if (plannedSplits.size > 0 && inserted) {
+        const used = new Set<number>();
+        for (const [idx, shares] of plannedSplits) {
+          const src = items[idx];
+          let pos = inserted.findIndex((r, i) => !used.has(i) && r.description === src.description && Number(r.amount) === src.amount && r.transaction_date === src.transaction_date);
+          if (pos < 0) pos = idx < inserted.length && !used.has(idx) ? idx : -1;
+          if (pos < 0) continue;
+          used.add(pos);
+          splitByRowId.set(inserted[pos].id, shares);
+        }
+        const splitRows = [...splitByRowId].flatMap(([item_id, shares]) => shares.map((s) => ({ item_id, person: s.person, amount: s.amount })));
+        if (splitRows.length) await supabase.from('invoice_item_splits').insert(splitRows);
       }
 
       // Lembra as categorias escolhidas (por descricao normalizada) para as proximas faturas,
@@ -206,9 +265,12 @@ export function useInvoiceImport() {
         );
       }
 
-      const mirrored = (inserted ?? [])
-        .map((row) => itemToTransaction(row, user.id))
-        .filter((t): t is NonNullable<typeof t> => t !== null);
+      const mirrored = (inserted ?? []).flatMap((row) => {
+        const base = itemToTransaction(row, user.id);
+        if (!base) return [];
+        const shares = splitByRowId.get(row.id);
+        return shares ? shares.map((s) => ({ ...base, holder_name: s.person, amount: s.amount, notes: `${MIRROR_NOTE} · dividido` })) : [base];
+      });
       if (mirrored.length > 0) {
         const { error: txError } = await supabase.from('transactions').insert(mirrored);
         if (txError) {
@@ -256,7 +318,7 @@ export function useInvoiceImport() {
         invoiceId = data.id;
       }
 
-      const ok = await writeItems(invoiceId, input.items, input.categorization, input.cards);
+      const ok = await writeItems(invoiceId, input.items, input.categorization, input.cards, input.attribution);
       if (!ok) return { status: 'error' };
 
       const total = input.items.reduce((s, i) => s + i.amount, 0) + input.previousBalance;
@@ -271,5 +333,5 @@ export function useInvoiceImport() {
     [user, findExistingInvoice, ensureHolders, writeItems, toast],
   );
 
-  return { findCardByLastFour, findExistingInvoice, loadCategorization, loadKnownKinds, ensureHolders, writeItems, importInvoice };
+  return { findCardByLastFour, findExistingInvoice, loadCategorization, loadKnownKinds, loadAttribution, ensureHolders, writeItems, importInvoice };
 }

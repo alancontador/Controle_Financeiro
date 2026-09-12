@@ -9,11 +9,12 @@ import { extractPdfLines } from '@/lib/pdf/extractText';
 import { parseBradescoFatura, type BradescoItem, type BradescoParseResult } from '@/lib/pdf/bradesco';
 import { CARD_CATEGORIES } from '@/lib/pdf/autoCategory';
 import { CARD_KINDS, CARD_KIND_LABEL, classifyInvoiceCards, type CardKind, type InvoiceCard } from '@/lib/cards/kinds';
+import { resolveAttribution, type AttributionMemory } from '@/lib/cards/attribution';
 
 /** Item no formato que a tabela invoice_items espera. */
 export type ImportedInvoiceItem = BradescoItem & { is_previous_balance: boolean; assigned_to?: string | null };
 
-type ReviewItem = BradescoItem & { assigned_to?: string | null };
+type ReviewItem = BradescoItem & { assigned_to?: string | null; remembered_split?: string };
 
 interface Props {
   open: boolean;
@@ -29,13 +30,15 @@ interface Props {
   knownKinds?: ReadonlyMap<string, CardKind>;
   /** Pessoas da casa, para realocar uma compra a outro responsavel ja na revisao. */
   people?: string[];
+  /** Realocacoes/divisoes lembradas de importacoes anteriores. */
+  attribution?: AttributionMemory;
 }
 
 type Conferencia = Pick<BradescoParseResult, 'totalFatura' | 'parsedTotal' | 'cardTotals' | 'dueDate'>;
 
 const sameCents = (a: number, b: number) => Math.abs(a - b) < 0.005;
 
-export function ImportPdfModal({ open, onClose, onConfirm, parsed, categoryOptions, suggest, knownKinds, people = [] }: Props) {
+export function ImportPdfModal({ open, onClose, onConfirm, parsed, categoryOptions, suggest, knownKinds, people = [], attribution }: Props) {
   const [items, setItems] = useState<ReviewItem[]>([]);
   const [cards, setCards] = useState<InvoiceCard[]>([]);
   const [previousBalance, setPreviousBalance] = useState(0);
@@ -53,7 +56,16 @@ export function ImportPdfModal({ open, onClose, onConfirm, parsed, categoryOptio
   };
 
   const applyResult = (result: BradescoParseResult) => {
-    setItems(suggest ? result.items.map((i) => ({ ...i, category: suggest(i.description) })) : result.items);
+    setItems(result.items.map((i) => {
+      const remembered = attribution ? resolveAttribution(i, attribution) : null;
+      return {
+        ...i,
+        category: suggest ? suggest(i.description) : i.category,
+        // Realocacao lembrada ja aparece na revisao; divisao lembrada e recriada ao confirmar.
+        assigned_to: remembered?.assigned_to ?? null,
+        remembered_split: remembered?.shares ? remembered.shares.map((s) => `${s.person.split(' ')[0]} ${Math.round(s.fraction * 100)}%`).join(' · ') : undefined,
+      };
+    }));
     setCards(classifyInvoiceCards(result.header, knownKinds));
     setPreviousBalance(result.previousBalance);
     setConferencia(result);
@@ -267,6 +279,11 @@ export function ImportPdfModal({ open, onClose, onConfirm, parsed, categoryOptio
                                   </TableCell>
                                   {card.lastFour && (
                                     <TableCell>
+                                      {item.remembered_split && (
+                                        <span className="block text-[11px] text-primary mb-1" title="Divisão lembrada da importação anterior; será recriada ao confirmar">
+                                          ✂ {item.remembered_split}
+                                        </span>
+                                      )}
                                       <Select value={item.assigned_to || item.holder_name} onValueChange={v => updateItemPerson(globalIdx, v)}>
                                         <SelectTrigger className={`h-8 text-xs w-[170px] ${item.assigned_to ? 'border-primary/60 text-primary' : ''}`}><SelectValue /></SelectTrigger>
                                         <SelectContent>

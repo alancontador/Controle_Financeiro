@@ -16,6 +16,7 @@ import { usePeople } from '@/hooks/usePeople';
 import { SplitItemDialog } from '@/components/cards/SplitItemDialog';
 import { isPaymentLine } from '@/lib/cards/mirror';
 import type { InvoiceItem } from '@/hooks/useCreditCards';
+import type { AttributionMemory } from '@/lib/cards/attribution';
 import { UpcomingInvoices } from '@/components/cards/UpcomingInvoices';
 import { CARD_KIND_LABEL, type CardKind, type InvoiceCard } from '@/lib/cards/kinds';
 import { AddItemModal } from '@/components/cards/AddItemModal';
@@ -44,14 +45,16 @@ const CardInvoices = () => {
   const [excelModalOpen, setExcelModalOpen] = useState(false);
   const [pdfModalOpen, setPdfModalOpen] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
-  const { loadCategorization, loadKnownKinds, ensureHolders, writeItems } = useInvoiceImport();
+  const { loadCategorization, loadKnownKinds, loadAttribution, ensureHolders, writeItems } = useInvoiceImport();
+  const [attribution, setAttribution] = useState<AttributionMemory>(new Map());
   const [categorization, setCategorization] = useState<Categorization | null>(null);
   const [knownKinds, setKnownKinds] = useState<Map<string, CardKind>>(new Map());
 
   const openPdfModal = async () => {
-    const [cat, kinds] = await Promise.all([loadCategorization(), loadKnownKinds(cardId || '')]);
+    const [cat, kinds, attr] = await Promise.all([loadCategorization(), loadKnownKinds(cardId || ''), loadAttribution()]);
     setCategorization(cat);
     setKnownKinds(kinds);
+    setAttribution(attr);
     setPdfModalOpen(true);
   };
 
@@ -145,7 +148,7 @@ const CardInvoices = () => {
   const handlePdfImport = async (importItems: ImportableItem[], prevBalance: number, cards: InvoiceCard[]) => {
     if (!selectedInvoiceId || !categorization || !cardId) return;
     await ensureHolders(cardId, cards);
-    const ok = await writeItems(selectedInvoiceId, importItems, categorization, cards);
+    const ok = await writeItems(selectedInvoiceId, importItems, categorization, cards, attribution);
     if (!ok) return;
     if (prevBalance > 0) await updatePreviousBalance(selectedInvoiceId, prevBalance);
     await fetchItems(selectedInvoiceId);
@@ -442,6 +445,7 @@ const CardInvoices = () => {
           suggest={categorization?.suggest}
           knownKinds={knownKinds}
           people={householdPeople}
+          attribution={attribution}
           onClose={() => setPdfModalOpen(false)}
           onConfirm={handlePdfImport}
         />

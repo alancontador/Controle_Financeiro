@@ -14,6 +14,7 @@ import { ImportPdfModal, type ImportedInvoiceItem } from '@/components/cards/Imp
 import { useInvoiceImport, type Categorization } from '@/hooks/useInvoiceImport';
 import { usePeople } from '@/hooks/usePeople';
 import type { CardKind, InvoiceCard } from '@/lib/cards/kinds';
+import type { AttributionMemory } from '@/lib/cards/attribution';
 import type { CreditCard, Invoice } from '@/hooks/useCreditCards';
 
 interface Props {
@@ -46,7 +47,7 @@ function cardFromHeader(parsed: BradescoParseResult): Partial<CardFormData> {
  */
 export function ImportInvoiceFlow({ cards, createCard, onImported }: Props) {
   const { toast } = useToast();
-  const { findCardByLastFour, findExistingInvoice, importInvoice, loadCategorization, loadKnownKinds } = useInvoiceImport();
+  const { findCardByLastFour, findExistingInvoice, importInvoice, loadCategorization, loadKnownKinds, loadAttribution } = useInvoiceImport();
   const { people } = usePeople();
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -54,6 +55,7 @@ export function ImportInvoiceFlow({ cards, createCard, onImported }: Props) {
   const [parsed, setParsed] = useState<BradescoParseResult | null>(null);
   const [categorization, setCategorization] = useState<Categorization | null>(null);
   const [knownKinds, setKnownKinds] = useState<Map<string, CardKind>>(new Map());
+  const [attribution, setAttribution] = useState<AttributionMemory>(new Map());
   const [cardId, setCardId] = useState<string | null>(null);
   const [cardModalOpen, setCardModalOpen] = useState(false);
   const [duplicate, setDuplicate] = useState<Invoice | null>(null);
@@ -96,7 +98,9 @@ export function ImportInvoiceFlow({ cards, createCard, onImported }: Props) {
         return;
       }
       setParsed(result);
-      setCategorization(await loadCategorization());
+      const [cat, attr] = await Promise.all([loadCategorization(), loadAttribution()]);
+      setCategorization(cat);
+      setAttribution(attr);
       const existing = findCardByLastFour(cards, result.header.lastFour);
       if (existing) {
         await continueWithCard(existing.id, result);
@@ -141,7 +145,7 @@ export function ImportInvoiceFlow({ cards, createCard, onImported }: Props) {
     if (!parsed || !cardId || !categorization) return;
     setBusy(true);
     const outcome = await importInvoice(
-      { cardId, header: parsed.header, items, previousBalance, closingDate: parsed.header.closingDate!, categorization, cards },
+      { cardId, header: parsed.header, items, previousBalance, closingDate: parsed.header.closingDate!, categorization, cards, attribution },
       { replace },
     );
     setBusy(false);
@@ -197,6 +201,7 @@ export function ImportInvoiceFlow({ cards, createCard, onImported }: Props) {
         suggest={categorization?.suggest}
         knownKinds={knownKinds}
         people={people}
+        attribution={attribution}
         onClose={resetAll}
         onConfirm={handleConfirm}
       />

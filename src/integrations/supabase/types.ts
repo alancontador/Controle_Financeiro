@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      attribution_memory: {
+        Row: {
+          user_id: string
+          key: string
+          assigned_to: string | null
+          shares: Json | null
+          updated_at: string
+        }
+        Insert: {
+          user_id: string
+          key: string
+          assigned_to?: string | null
+          shares?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          user_id?: string
+          key?: string
+          assigned_to?: string | null
+          shares?: Json | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       budgets: {
         Row: {
           amount: number
