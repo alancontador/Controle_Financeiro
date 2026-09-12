@@ -53,6 +53,11 @@ describe('suggestCategory', () => {
     expect(suggestCategory('ADEGA GLOBAL LTDA ME', memory).category).toBe('Restaurantes');
     expect(suggestCategory('BESNI SHOP GUARULHOS', memory).category).toBe('Vestuário');
     expect(suggestCategory('JULIA LASER', memory).category).toBe('Cuidados Pessoais');
+    // vistos na fatura real
+    expect(suggestCategory('DENTAL SPEED Quantit', memory).category).toBe('Saúde');
+    expect(suggestCategory('MarleyMall', memory).category).toBe('Compras');
+    expect(suggestCategory('CASA DAS ALIANCAS', memory).category).toBe('Compras');
+    expect(suggestCategory('ARTWALK', memory).category).toBe('Vestuário');
   });
 
   it('a regra mais especifica vence quando duas casam (VET antes de CLINICA)', () => {

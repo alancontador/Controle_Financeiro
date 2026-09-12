@@ -39,7 +39,8 @@ export function normalizeDescription(description: string): string {
 
 /**
  * Palavra-chave: casa por palavra inteira; com `*` no fim casa o inicio da
- * palavra (VET* pega VET e VETERINARIA). Frases sao permitidas.
+ * palavra (VET* pega VET e VETERINARIA); com `*` no inicio casa o fim
+ * (*MALL pega MARLEYMALL). Frases sao permitidas.
  */
 interface Rule {
   category: string;
@@ -63,7 +64,7 @@ export const CATEGORY_RULES: Rule[] = [
     category: 'Saúde',
     keywords: [
       'DROGARIA', 'DROGA*', 'FARMACIA', 'FARMA*', 'DROGASIL', 'RAIA', 'PAGUE MENOS', 'ULTRAFARMA', 'HOSPITAL',
-      'CLINICA', 'LABORATORIO', 'MEDIC*', 'DENTISTA', 'ODONTO*', 'FLEURY', 'DASA', 'UNIMED', 'PSICOLOG*', 'FISIOTERAP*',
+      'CLINICA', 'LABORATORIO', 'MEDIC*', 'DENTISTA', 'DENTAL*', 'ODONTO*', 'FLEURY', 'DASA', 'UNIMED', 'PSICOLOG*', 'FISIOTERAP*',
     ],
   },
   {
@@ -92,7 +93,7 @@ export const CATEGORY_RULES: Rule[] = [
   { category: 'Esportes', keywords: ['DECATHLON', 'CENTAURO', 'NETSHOES', 'ACADEMIA', 'SMARTFIT', 'SMART FIT', 'BLUEFIT', 'CROSSFIT', 'GYM', 'BIKE', 'CICL*', 'NATACAO'] },
   {
     category: 'Vestuário',
-    keywords: ['RENNER', 'RIACHUELO', 'C&A', 'CEA', 'ZARA', 'HERING', 'MARISA', 'BESNI', 'PERNAMBUCANAS', 'CALCADO*', 'SAPAT*', 'BOUTIQUE', 'MODA', 'ROUPA*', 'TORRA'],
+    keywords: ['RENNER', 'RIACHUELO', 'C&A', 'CEA', 'ZARA', 'HERING', 'MARISA', 'BESNI', 'PERNAMBUCANAS', 'CALCADO*', 'SAPAT*', 'BOUTIQUE', 'MODA', 'ROUPA*', 'TORRA', 'ARTWALK'],
   },
   {
     category: 'Cuidados Pessoais',
@@ -102,7 +103,7 @@ export const CATEGORY_RULES: Rule[] = [
     category: 'Compras',
     keywords: [
       'MAGALU', 'MAGAZINE LUIZA', 'AMERICANAS', 'MERCADO LIVRE', 'MERCADOLIVRE', 'SHOPEE', 'ALIEXPRESS', 'SHEIN',
-      'TIKTOK SHOP', 'AMAZON', 'CASAS BAHIA', 'KABUM', 'LEROY', 'TELHANORTE', 'KALUNGA', 'PAPELARIA', 'SHOP', 'LOJA*',
+      'TIKTOK SHOP', 'AMAZON', 'CASAS BAHIA', 'KABUM', 'LEROY', 'TELHANORTE', 'KALUNGA', 'PAPELARIA', 'SHOP', 'LOJA*', '*MALL', 'ALIANCA*', 'JOALHERIA',
     ],
   },
   { category: 'Lazer', keywords: ['CINEMA', 'CINEMARK', 'KINOPLEX', 'TEATRO', 'INGRESSO*', 'STEAM', 'PLAYSTATION', 'XBOX', 'NINTENDO', 'PARQUE', 'CLUBE'] },
@@ -137,9 +138,11 @@ const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const compiled = CATEGORY_RULES.map((rule) => ({
   category: rule.category,
-  patterns: rule.keywords.map((kw) =>
-    kw.endsWith('*') ? new RegExp(`\\b${escapeRe(kw.slice(0, -1))}`) : new RegExp(`\\b${escapeRe(kw)}\\b`),
-  ),
+  patterns: rule.keywords.map((kw) => {
+    if (kw.startsWith('*')) return new RegExp(`${escapeRe(kw.slice(1))}\\b`);
+    if (kw.endsWith('*')) return new RegExp(`\\b${escapeRe(kw.slice(0, -1))}`);
+    return new RegExp(`\\b${escapeRe(kw)}\\b`);
+  }),
 }));
 
 export function suggestCategory(description: string, memory: CategoryMemory): CategorySuggestion {

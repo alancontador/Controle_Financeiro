@@ -45,6 +45,14 @@ docker run -p 8080:80 \
   controle-financeiro
 ```
 
+## Banco (Supabase)
+
+Projeto `pscyowgeyuzpecfcwabw` (regiao sa-east-1), na organizacao do usuario. As
+migrations em `supabase/migrations/` sao a fonte de verdade do esquema; aplicar
+com o SQL Editor ou pela Management API (`POST /v1/projects/<ref>/database/query`).
+A funcao `process-recurring-transactions` roda diariamente por `pg_cron`
+(migration `20260912000000_cron_recurring.sql`).
+
 ## Edge Functions (Supabase)
 
 | Funcao | O que faz |
