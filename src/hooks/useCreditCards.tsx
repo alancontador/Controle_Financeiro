@@ -113,7 +113,7 @@ export function useCreditCards() {
 
     if (error) {
       toast({ title: 'Erro ao criar cartão', description: error.message, variant: 'destructive' });
-      return;
+      return null;
     }
 
     // Create primary holder
@@ -125,6 +125,7 @@ export function useCreditCards() {
 
     toast({ title: 'Cartão criado com sucesso!' });
     fetchCards();
+    return card as CreditCard;
   };
 
   const updateCard = async (id: string, data: Partial<CreditCard>) => {
@@ -245,6 +246,19 @@ export function useInvoices(cardId: string) {
     return true;
   };
 
+  const deleteInvoice = async (invoiceId: string) => {
+    // invoice_items (e, depois, as transacoes espelhadas) caem por CASCADE.
+    const { error } = await supabase.from('invoices').delete().eq('id', invoiceId);
+    if (error) {
+      toast({ title: 'Erro ao excluir fatura', description: error.message, variant: 'destructive' });
+      return false;
+    }
+    toast({ title: 'Fatura excluída' });
+    setItems([]);
+    await fetchAll();
+    return true;
+  };
+
   const updatePreviousBalance = async (invoiceId: string, previousBalance: number) => {
     await supabase.from('invoices').update({ previous_balance: previousBalance }).eq('id', invoiceId);
     await recalcTotal(invoiceId);
@@ -269,5 +283,5 @@ export function useInvoices(cardId: string) {
     fetchAll();
   };
 
-  return { card, invoices, holders, items, loading, fetchAll, fetchItems, createInvoice, addItem, addItemsBatch, updatePreviousBalance };
+  return { card, invoices, holders, items, loading, fetchAll, fetchItems, createInvoice, deleteInvoice, addItem, addItemsBatch, updatePreviousBalance };
 }

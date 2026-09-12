@@ -17,17 +17,22 @@ const X = { date: 45.4, desc: 66.6, inst: 116.1, city: 205.5, value: 327.6, righ
 function faturaSintetica(): PdfLine[] {
   return [
     // ---- pagina 1: resumo ----
+    row(1, ['ELO GRAFITE', 414.7]),
     row(1, ['Total da fatura', 420.7], ['Vencimento', 497.4]),
     row(1, ['R$ 1.480,00', 429.1], ['10/09/2026', 497.4]),
     row(1, ['Previsão de fechamento da próxima fatura: 29/09/2026', 417.0]),
+    row(1, ['Limite de compras', 417.0], ['Limite de saque', 487.8]),
+    row(1, ['R$ 23.200,00', 426.0], ['R$ 3.480,00', 493.0]),
     row(1, ['Saldo anterior......................... R$', 39.7], ['800,00', 143.4]),
     row(1, ['(=)Total.................................... R$', 39.7], ['1.480,00', 143.4]),
 
     // ---- pagina 2: lancamentos ----
     row(2, ['Número do Cartão', 39.7], ['1234 XXXX XXXX 1111', 130.4]),
+    // "Disponível em" e a data ficam em linhas diferentes (8pt), na coluna da direita
+    row(2, ['Disponível em', 503.8]),
     row(2, ['Data', 39.7], ['Histórico de Lançamentos', 66.6], ['Cidade', 205.5], ['US$', 290], ['R$', 335]),
     // pagamento antes de qualquer bloco de cartao, com o sinal colado no valor
-    row(2, ['05/08', X.date], ['PAGTO ANTECIPADO PIX', 73.7], ['800,00 -', 320.4]),
+    row(2, ['05/08', X.date], ['PAGTO ANTECIPADO PIX', 73.7], ['800,00 -', 320.4], ['28/08/2026', 507.5]),
     // cabecalho do cartao com vazamento da coluna da direita
     row(2, ['ANA SILVA', X.date], ['Cartão', 209.7], ['1234 XXXX XXXX 1111', 232.1], ['Crédito Rotativo / Atraso', X.right]),
     // compra parcelada de dezembro do ano anterior, com vazamento de limites
@@ -137,6 +142,27 @@ describe('parseBradescoFatura', () => {
 
   it('confere a soma dos lancamentos dos cartoes com o total da fatura', () => {
     expect(result.parsedTotal).toBe(1480);
+  });
+
+  it('le o cabecalho do cartao para pre-preencher o cadastro', () => {
+    expect(result.header).toEqual({
+      bank: 'Bradesco',
+      brand: 'Elo',
+      brandLabel: 'ELO GRAFITE',
+      lastFour: '1111',
+      limit: 23200,
+      closingDate: '2026-08-28',
+      holders: ['ANA SILVA', 'BRUNO COSTA'],
+    });
+  });
+
+  it('sem "Disponível em", deriva o fechamento da previsao da proxima fatura (um mes antes)', () => {
+    const lines = faturaSintetica().filter((l) => !/Dispon/.test(l.text)).map((l) =>
+      l.items.some((i) => i.text === '28/08/2026')
+        ? { ...l, items: l.items.filter((i) => i.text !== '28/08/2026'), text: l.text.replace(' 28/08/2026', '') }
+        : l,
+    );
+    expect(parseBradescoFatura(lines).header.closingDate).toBe('2026-08-29');
   });
 
   it('devolve erro quando nao ha lancamentos', () => {

@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,14 +15,18 @@ export type ImportedInvoiceItem = BradescoItem & { is_previous_balance: boolean 
 interface Props {
   open: boolean;
   onClose: () => void;
-  onConfirm: (items: ImportedInvoiceItem[], previousBalance: number) => void;
+  onConfirm: (items: ImportedInvoiceItem[], previousBalance: number) => void | Promise<void>;
+  /** Resultado ja lido (fluxo da aba Cartoes): pula a escolha do arquivo e vai direto para a revisao. */
+  parsed?: BradescoParseResult | null;
+  /** Lista de categorias oferecida na revisao. Padrao: a lista fixa do cartao. */
+  categoryOptions?: string[];
 }
 
 type Conferencia = Pick<BradescoParseResult, 'totalFatura' | 'parsedTotal' | 'cardTotals' | 'dueDate'>;
 
 const sameCents = (a: number, b: number) => Math.abs(a - b) < 0.005;
 
-export function ImportPdfModal({ open, onClose, onConfirm }: Props) {
+export function ImportPdfModal({ open, onClose, onConfirm, parsed, categoryOptions }: Props) {
   const [items, setItems] = useState<BradescoItem[]>([]);
   const [previousBalance, setPreviousBalance] = useState(0);
   const [conferencia, setConferencia] = useState<Conferencia | null>(null);
@@ -36,6 +40,16 @@ export function ImportPdfModal({ open, onClose, onConfirm }: Props) {
     setConferencia(null);
     setError('');
   };
+
+  const applyResult = (result: BradescoParseResult) => {
+    setItems(result.items);
+    setPreviousBalance(result.previousBalance);
+    setConferencia(result);
+  };
+
+  useEffect(() => {
+    if (open && parsed && !parsed.error) applyResult(parsed);
+  }, [open, parsed]);
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -51,9 +65,7 @@ export function ImportPdfModal({ open, onClose, onConfirm }: Props) {
       if (result.error) {
         setError(result.error);
       } else {
-        setItems(result.items);
-        setPreviousBalance(result.previousBalance);
-        setConferencia(result);
+        applyResult(result);
       }
     } catch (err) {
       setError('Erro ao processar o PDF: ' + (err instanceof Error ? err.message : 'formato incompatível'));
@@ -72,9 +84,15 @@ export function ImportPdfModal({ open, onClose, onConfirm }: Props) {
     setItems(prev => prev.map((item, i) => i === index ? { ...item, description } : item));
   };
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     const mapped: ImportedInvoiceItem[] = items.map(item => ({ ...item, is_previous_balance: false }));
-    onConfirm(mapped, previousBalance);
+    setLoading(true);
+    try {
+      // Espera a gravacao terminar antes de fechar, para o erro (se houver) aparecer com o modal aberto.
+      await onConfirm(mapped, previousBalance);
+    } finally {
+      setLoading(false);
+    }
     reset();
     onClose();
   };
@@ -104,12 +122,14 @@ export function ImportPdfModal({ open, onClose, onConfirm }: Props) {
           <DialogTitle>Importar Fatura PDF (Bradesco)</DialogTitle>
         </DialogHeader>
 
-        <div className="mb-4">
-          <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()} disabled={loading}>
-            <Upload className="w-4 h-4 mr-1" /> {loading ? 'Processando...' : 'Selecionar PDF'}
-          </Button>
-          <Input ref={fileRef} type="file" accept=".pdf" className="hidden" onChange={handleFile} />
-        </div>
+        {!parsed && (
+          <div className="mb-4">
+            <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()} disabled={loading}>
+              <Upload className="w-4 h-4 mr-1" /> {loading ? 'Processando...' : 'Selecionar PDF'}
+            </Button>
+            <Input ref={fileRef} type="file" accept=".pdf" className="hidden" onChange={handleFile} />
+          </div>
+        )}
 
         {error && (
           <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3 mb-4">
@@ -190,7 +210,7 @@ export function ImportPdfModal({ open, onClose, onConfirm }: Props) {
                               <Select value={item.category} onValueChange={v => updateItemCategory(globalIdx, v)}>
                                 <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
                                 <SelectContent>
-                                  {CARD_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                                  {(categoryOptions ?? CARD_CATEGORIES).map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                                 </SelectContent>
                               </Select>
                             </TableCell>
@@ -206,7 +226,7 @@ export function ImportPdfModal({ open, onClose, onConfirm }: Props) {
 
             <div className="border-t pt-4 flex justify-between items-center">
               <p className="font-bold text-lg">Total Geral: {fmt(total)}</p>
-              <Button onClick={handleConfirm}>Confirmar Importação</Button>
+              <Button onClick={handleConfirm} disabled={loading}>{loading ? 'Importando...' : 'Confirmar Importação'}</Button>
             </div>
           </>
         )}

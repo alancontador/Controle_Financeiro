@@ -6,16 +6,38 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { CreditCard } from '@/hooks/useCreditCards';
 
+export interface CardFormData {
+  nickname: string;
+  brand: string;
+  issuer_bank: string;
+  last_four_digits: string;
+  total_limit: number;
+  closing_day: number;
+  due_day: number;
+  holder_name: string;
+}
+
 interface CardModalProps {
   open: boolean;
   onClose: () => void;
-  onSave: (data: any) => void;
+  onSave: (data: CardFormData) => void;
   card?: CreditCard | null;
+  /** Valores iniciais para um cartao novo (ex.: lidos de uma fatura). Ignorado ao editar. */
+  initial?: Partial<CardFormData>;
+  title?: string;
 }
 
 const BRANDS = ['Visa', 'Mastercard', 'Elo', 'Amex', 'Hipercard', 'Outro'];
 
-export function CardModal({ open, onClose, onSave, card }: CardModalProps) {
+/** Formata uma string de centavos ("2320000") como moeda pt-BR ("23.200,00"). */
+const formatMoney = (val: string) => {
+  const num = val.replace(/\D/g, '');
+  if (!num) return '';
+  const cents = parseInt(num) / 100;
+  return cents.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
+export function CardModal({ open, onClose, onSave, card, initial, title }: CardModalProps) {
   const [nickname, setNickname] = useState('');
   const [brand, setBrand] = useState('Visa');
   const [issuerBank, setIssuerBank] = useState('');
@@ -36,10 +58,16 @@ export function CardModal({ open, onClose, onSave, card }: CardModalProps) {
       setDueDay(card.due_day.toString());
       setHolderName('');
     } else {
-      setNickname(''); setBrand('Visa'); setIssuerBank(''); setLastFour('');
-      setTotalLimit(''); setClosingDay(''); setDueDay(''); setHolderName('');
+      setNickname(initial?.nickname ?? '');
+      setBrand(initial?.brand ?? 'Visa');
+      setIssuerBank(initial?.issuer_bank ?? '');
+      setLastFour(initial?.last_four_digits ?? '');
+      setTotalLimit(initial?.total_limit !== undefined ? formatMoney(String(Math.round(initial.total_limit * 100))) : '');
+      setClosingDay(initial?.closing_day !== undefined ? String(initial.closing_day) : '');
+      setDueDay(initial?.due_day !== undefined ? String(initial.due_day) : '');
+      setHolderName(initial?.holder_name ?? '');
     }
-  }, [card, open]);
+  }, [card, open, initial]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,18 +85,11 @@ export function CardModal({ open, onClose, onSave, card }: CardModalProps) {
     onClose();
   };
 
-  const formatMoney = (val: string) => {
-    const num = val.replace(/\D/g, '');
-    if (!num) return '';
-    const cents = parseInt(num) / 100;
-    return cents.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  };
-
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{card ? 'Editar Cartão' : 'Cadastrar Cartão'}</DialogTitle>
+          <DialogTitle>{title ?? (card ? 'Editar Cartão' : 'Cadastrar Cartão')}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>

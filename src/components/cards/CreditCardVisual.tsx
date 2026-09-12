@@ -1,4 +1,4 @@
-import { CreditCard as CreditCardIcon, Edit, FileText } from 'lucide-react';
+import { CreditCard as CreditCardIcon, Edit, FileText, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import type { CreditCard } from '@/hooks/useCreditCards';
@@ -8,6 +8,7 @@ interface Props {
   usedAmount: number;
   onEdit: () => void;
   onViewInvoices: () => void;
+  onDelete?: () => void;
 }
 
 const brandColors: Record<string, string> = {
@@ -19,7 +20,7 @@ const brandColors: Record<string, string> = {
   Outro: 'from-gray-600 to-gray-800',
 };
 
-export function CreditCardVisual({ card, usedAmount, onEdit, onViewInvoices }: Props) {
+export function CreditCardVisual({ card, usedAmount, onEdit, onViewInvoices, onDelete }: Props) {
   const available = card.total_limit - usedAmount;
   const usagePercent = card.total_limit > 0 ? Math.min((usedAmount / card.total_limit) * 100, 100) : 0;
 
@@ -65,6 +66,11 @@ export function CreditCardVisual({ card, usedAmount, onEdit, onViewInvoices }: P
           <Button variant="outline" size="sm" className="flex-1" onClick={onEdit}>
             <Edit className="w-4 h-4 mr-1" /> Editar
           </Button>
+          {onDelete && (
+            <Button variant="outline" size="sm" onClick={onDelete} aria-label="Excluir cartão" title="Excluir cartão">
+              <Trash2 className="w-4 h-4 text-destructive" />
+            </Button>
+          )}
         </div>
       </div>
     </div>

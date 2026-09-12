@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Loader2, CreditCard } from 'lucide-react';
+import { Plus, Loader2, CreditCard, Trash2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { MobileNav } from '@/components/layout/MobileNav';
@@ -8,15 +8,21 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useCreditCards } from '@/hooks/useCreditCards';
 import { CreditCardVisual } from '@/components/cards/CreditCardVisual';
-import { CardModal } from '@/components/cards/CardModal';
+import { CardModal, type CardFormData } from '@/components/cards/CardModal';
+import { ImportInvoiceFlow } from '@/components/cards/ImportInvoiceFlow';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import type { CreditCard as CreditCardType } from '@/hooks/useCreditCards';
 
 const Cards = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
-  const { cards, loading, openInvoiceTotals, createCard, updateCard } = useCreditCards();
+  const { cards, loading, openInvoiceTotals, createCard, updateCard, deleteCard } = useCreditCards();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingCard, setEditingCard] = useState<CreditCardType | null>(null);
+  const [deletingCard, setDeletingCard] = useState<CreditCardType | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) navigate('/auth');
@@ -30,7 +36,7 @@ const Cards = () => {
     );
   }
 
-  const handleSave = (data: any) => {
+  const handleSave = (data: CardFormData) => {
     if (editingCard) {
       const { holder_name, ...rest } = data;
       updateCard(editingCard.id, rest);
@@ -51,9 +57,16 @@ const Cards = () => {
               <h1 className="text-2xl lg:text-3xl font-bold text-foreground tracking-tight">Meus Cartões</h1>
               <p className="text-muted-foreground text-sm mt-1">Gerencie seus cartões de crédito</p>
             </div>
-            <Button onClick={() => { setEditingCard(null); setModalOpen(true); }}>
-              <Plus className="w-4 h-4 mr-2" /> Novo Cartão
-            </Button>
+            <div className="flex gap-2">
+              <ImportInvoiceFlow
+                cards={cards}
+                createCard={createCard}
+                onImported={(cardId) => navigate(`/cartoes/${cardId}/faturas`)}
+              />
+              <Button onClick={() => { setEditingCard(null); setModalOpen(true); }}>
+                <Plus className="w-4 h-4 mr-2" /> Novo Cartão
+              </Button>
+            </div>
           </div>
         </motion.div>
 
@@ -76,11 +89,33 @@ const Cards = () => {
                   usedAmount={openInvoiceTotals[card.id] || 0}
                   onEdit={() => { setEditingCard(card); setModalOpen(true); }}
                   onViewInvoices={() => navigate(`/cartoes/${card.id}/faturas`)}
+                  onDelete={() => setDeletingCard(card)}
                 />
               </motion.div>
             ))}
           </div>
         )}
+
+        <AlertDialog open={!!deletingCard} onOpenChange={(o) => { if (!o) setDeletingCard(null); }}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Excluir o cartão {deletingCard?.nickname}?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Isso apaga todas as faturas e lançamentos deste cartão, e as despesas que foram
+                geradas a partir deles. Não dá para desfazer.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={() => { if (deletingCard) deleteCard(deletingCard.id); setDeletingCard(null); }}
+              >
+                <Trash2 className="w-4 h-4 mr-1" /> Excluir
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         <CardModal
           open={modalOpen}

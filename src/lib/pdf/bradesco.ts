@@ -1,4 +1,5 @@
 import { autoCategory } from './autoCategory';
+import { addMonths } from '@/lib/dates';
 import type { PdfLine, PdfTextItem } from './types';
 
 /**
@@ -31,7 +32,25 @@ export interface CardTotal {
   parsed: number;
 }
 
+/** Dados do cartao lidos do cabecalho, para pre-preencher o cadastro. */
+export interface BradescoHeader {
+  bank: 'Bradesco';
+  /** Bandeira normalizada para o cadastro (Elo, Visa, Mastercard, Amex, Hipercard, Outro). */
+  brand: string;
+  /** Texto como esta na fatura, ex. "ELO GRAFITE". */
+  brandLabel?: string;
+  /** Final do cartao principal ("Numero do Cartao"). */
+  lastFour?: string;
+  /** Limite de compras. */
+  limit?: number;
+  /** Data de fechamento desta fatura, ISO. */
+  closingDate?: string;
+  /** Nomes dos titulares, na ordem dos blocos. */
+  holders: string[];
+}
+
 export interface BradescoParseResult {
+  header: BradescoHeader;
   items: BradescoItem[];
   previousBalance: number;
   /** "Total da fatura em real" (ou o total do cabecalho, se aquele faltar). */
@@ -64,11 +83,23 @@ const RE_TOTAL = new RegExp(String.raw`^Total da fatura em real\s+(${MONEY})`, '
 const RE_CARD_TOTAL = new RegExp(String.raw`^Total para\s+(.+?)\s+(${MONEY})\s*$`, 'i');
 const RE_CARD_HEADER = /^(.+?)\s+Cart[ãa]o\s+\d{4}\s+X{4}\s+X{4}\s+(\d{4})/i;
 const RE_CARD_NUMBER_LABEL = /^N[uú]mero do Cart[ãa]o/i;
+const RE_CARD_NUMBER = /N[uú]mero do Cart[ãa]o\s+\d{4}\s+X{4}\s+X{4}\s+(\d{4})/i;
+const RE_BRAND = /^(ELO|VISA|MASTERCARD|MASTER|AMEX|HIPERCARD)\b/i;
+const RE_LIMIT_LABEL = /^Limite de compras/i;
+const RE_LIMIT_VALUE = new RegExp(String.raw`^R\$\s*(${MONEY})`);
+const RE_AVAILABLE_AT = /^Dispon[ií]vel em/i;
+const RE_FULL_DATE = /^(\d{2})\/(\d{2})\/(\d{4})$/;
+const RE_NEXT_CLOSING = /Previs[ãa]o de fechamento[^:]*:\s*(\d{2})\/(\d{2})\/(\d{4})/i;
 const RE_TRANSACTION = new RegExp(String.raw`^(\d{2})/(\d{2})\s+(.*?)\s*(${MONEY})\s*(-?)\s*$`);
 const RE_DATE_ITEM = /^\d{2}\/\d{2}(\s|$)/;
 const RE_INSTALLMENT = /(\d{2})\/(\d{2})(?=\s|$)/;
 
 const parseMoney = (s: string) => Number(s.replace(/\./g, '').replace(',', '.'));
+const toIso = (dd: string, mm: string, yyyy: string) => `${yyyy}-${mm}-${dd}`;
+
+const BRAND_NAMES: Record<string, string> = {
+  ELO: 'Elo', VISA: 'Visa', MASTERCARD: 'Mastercard', MASTER: 'Mastercard', AMEX: 'Amex', HIPERCARD: 'Hipercard',
+};
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
 /** Texto so da parte esquerda da linha, sem o que vazou da coluna da direita. */
@@ -90,6 +121,9 @@ export function parseBradescoFatura(lines: PdfLine[], today: Date = new Date()):
   let cardSum = 0;
   let parsedTotal = 0;
 
+  const header: BradescoHeader = { bank: 'Bradesco', brand: 'Outro', holders: [] };
+  let nextClosing: string | undefined;
+
   // O ano so pode ser resolvido depois de ler o vencimento (pagina 1), mas os
   // lancamentos vem depois (paginas 2+), entao um unico passo basta.
   const yearFor = (month: number): number => {
@@ -99,8 +133,49 @@ export function parseBradescoFatura(lines: PdfLine[], today: Date = new Date()):
     return month > refMonth ? refYear - 1 : refYear;
   };
 
-  for (const line of lines) {
+  for (let idx = 0; idx < lines.length; idx++) {
+    const line = lines[idx];
     const text = line.text;
+
+    // ---- cabecalho do cartao (pagina 1 e topo da 2) ----
+    if (!header.brandLabel && line.page === 1) {
+      const brandItem = line.items.find((i) => RE_BRAND.test(i.text.trim()));
+      if (brandItem) {
+        header.brandLabel = brandItem.text.trim();
+        header.brand = BRAND_NAMES[brandItem.text.trim().match(RE_BRAND)![1].toUpperCase()] ?? 'Outro';
+      }
+    }
+    if (!header.lastFour) {
+      const m = text.match(RE_CARD_NUMBER);
+      if (m) header.lastFour = m[1];
+    }
+    if (header.limit === undefined && RE_LIMIT_LABEL.test(text)) {
+      // O rotulo e o valor ficam em linhas diferentes, as vezes com um codigo da
+      // coluna da esquerda no meio. A primeira linha seguinte que COMECA com R$
+      // traz o limite de compras (o segundo valor dela e o de saque).
+      for (let j = idx + 1; j <= idx + 3 && j < lines.length; j++) {
+        const m = lines[j].text.match(RE_LIMIT_VALUE);
+        if (m) {
+          header.limit = parseMoney(m[1]);
+          break;
+        }
+      }
+    }
+    if (!header.closingDate && line.items.some((i) => RE_AVAILABLE_AT.test(i.text.trim()))) {
+      // A data fica na linha de baixo, na coluna da direita - e pode ter sido
+      // agrupada com um lancamento da esquerda. Procura por item, nao por linha.
+      for (let j = idx + 1; j <= idx + 3 && j < lines.length && !header.closingDate; j++) {
+        const d = lines[j].items.find((i) => i.x >= COL.valueEnd && RE_FULL_DATE.test(i.text.trim()));
+        if (d) {
+          const [, dd, mm, yyyy] = d.text.trim().match(RE_FULL_DATE)!;
+          header.closingDate = toIso(dd, mm, yyyy);
+        }
+      }
+    }
+    if (!nextClosing) {
+      const m = text.match(RE_NEXT_CLOSING);
+      if (m) nextClosing = toIso(m[1], m[2], m[3]);
+    }
 
     if (!dueDate) {
       const m = text.match(RE_DUE);
@@ -133,9 +208,11 @@ export function parseBradescoFatura(lines: PdfLine[], today: Date = new Date()):
       continue;
     }
 
-    const header = text.match(RE_CARD_HEADER);
-    if (header && !RE_CARD_NUMBER_LABEL.test(text)) {
-      currentHolder = `${header[1].trim()} (final ${header[2]})`;
+    const cardHeader = text.match(RE_CARD_HEADER);
+    if (cardHeader && !RE_CARD_NUMBER_LABEL.test(text)) {
+      const name = cardHeader[1].trim();
+      if (!header.holders.includes(name)) header.holders.push(name);
+      currentHolder = `${name} (final ${cardHeader[2]})`;
       inCardBlock = true;
       cardSum = 0;
       continue;
@@ -161,8 +238,11 @@ export function parseBradescoFatura(lines: PdfLine[], today: Date = new Date()):
     }
   }
 
+  if (!header.closingDate && nextClosing) header.closingDate = addMonths(nextClosing, -1);
+
   if (items.length === 0) {
     return {
+      header,
       items,
       previousBalance,
       cardTotals,
@@ -172,6 +252,7 @@ export function parseBradescoFatura(lines: PdfLine[], today: Date = new Date()):
   }
 
   return {
+    header,
     items,
     previousBalance,
     totalFatura: totalFatura ?? headerTotal,

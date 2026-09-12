@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Loader2, Plus, ArrowLeft, Upload, FileSpreadsheet } from 'lucide-react';
+import { Loader2, Plus, ArrowLeft, Upload, FileSpreadsheet, Trash2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { MobileNav } from '@/components/layout/MobileNav';
@@ -14,6 +14,10 @@ import { useInvoices } from '@/hooks/useCreditCards';
 import { AddItemModal } from '@/components/cards/AddItemModal';
 import { ImportExcelModal } from '@/components/cards/ImportExcelModal';
 import { ImportPdfModal } from '@/components/cards/ImportPdfModal';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 const CardInvoices = () => {
   const { cardId } = useParams<{ cardId: string }>();
@@ -21,13 +25,14 @@ const CardInvoices = () => {
   const navigate = useNavigate();
   const {
     card, invoices, holders, items, loading,
-    fetchItems, createInvoice, addItem, addItemsBatch, updatePreviousBalance,
+    fetchItems, createInvoice, deleteInvoice, addItem, addItemsBatch, updatePreviousBalance,
   } = useInvoices(cardId || '');
 
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string>('');
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [excelModalOpen, setExcelModalOpen] = useState(false);
   const [pdfModalOpen, setPdfModalOpen] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) navigate('/auth');
@@ -198,19 +203,24 @@ const CardInvoices = () => {
                       </CardTitle>
                       <div className="mt-1">{statusBadge(selectedInvoice.status)}</div>
                     </div>
-                    {isOpen && (
-                      <div className="flex flex-wrap gap-2">
-                        <Button size="sm" onClick={() => setAddModalOpen(true)}>
-                          <Plus className="w-4 h-4 mr-1" /> Adicionar Lançamento
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => setExcelModalOpen(true)}>
-                          <FileSpreadsheet className="w-4 h-4 mr-1" /> Importar Excel/CSV
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => setPdfModalOpen(true)}>
-                          <Upload className="w-4 h-4 mr-1" /> Importar PDF Bradesco
-                        </Button>
-                      </div>
-                    )}
+                    <div className="flex flex-wrap gap-2">
+                      {isOpen && (
+                        <>
+                          <Button size="sm" onClick={() => setAddModalOpen(true)}>
+                            <Plus className="w-4 h-4 mr-1" /> Adicionar Lançamento
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => setExcelModalOpen(true)}>
+                            <FileSpreadsheet className="w-4 h-4 mr-1" /> Importar Excel/CSV
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => setPdfModalOpen(true)}>
+                            <Upload className="w-4 h-4 mr-1" /> Importar PDF Bradesco
+                          </Button>
+                        </>
+                      )}
+                      <Button size="sm" variant="outline" onClick={() => setConfirmDeleteOpen(true)} title="Excluir fatura">
+                        <Trash2 className="w-4 h-4 mr-1 text-destructive" /> Excluir fatura
+                      </Button>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -291,6 +301,33 @@ const CardInvoices = () => {
           onConfirm={handleExcelImport}
           holders={holders}
         />
+        <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Excluir esta fatura?</AlertDialogTitle>
+              <AlertDialogDescription>
+                {selectedInvoice
+                  ? `Período ${fmtDate(selectedInvoice.period_start)} a ${fmtDate(selectedInvoice.period_end)}. `
+                  : ''}
+                Apaga todos os lançamentos dela e as despesas geradas a partir deles. Não dá para desfazer.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={async () => {
+                  if (!selectedInvoiceId) return;
+                  const ok = await deleteInvoice(selectedInvoiceId);
+                  if (ok) setSelectedInvoiceId('');
+                }}
+              >
+                <Trash2 className="w-4 h-4 mr-1" /> Excluir
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
         <ImportPdfModal
           open={pdfModalOpen}
           onClose={() => setPdfModalOpen(false)}
