@@ -56,6 +56,13 @@ describe('itemToTransaction', () => {
     expect(t.card_last_four).toBe('4760');
   });
 
+  it('compra de terceiro (cartao emprestado) nao vira despesa do usuario', () => {
+    const third = new Set(['CARLOS']);
+    expect(itemToTransaction({ ...base, assigned_to: 'CARLOS' }, 'user-1', third)).toBeNull();
+    // sem realocacao para terceiro, continua despesa normal
+    expect(itemToTransaction(base, 'user-1', third)).not.toBeNull();
+  });
+
   it('sem categoria resolvida, grava sem category_id (aparece como sem categoria)', () => {
     expect(itemToTransaction({ ...base, category_id: null }, 'user-1')!.category_id).toBeNull();
   });

@@ -17,6 +17,7 @@ import CalendarView from "./pages/CalendarView";
 import Categories from "./pages/Categories";
 import NotFound from "./pages/NotFound";
 import Cards from "./pages/Cards";
+import People from "./pages/People";
 import CardInvoices from "./pages/CardInvoices";
 
 const queryClient = new QueryClient();
@@ -41,6 +42,7 @@ const App = () => (
             <Route path="/calendar" element={<CalendarView />} />
             <Route path="/categories" element={<Categories />} />
             <Route path="/cartoes" element={<Cards />} />
+            <Route path="/pessoas" element={<People />} />
             <Route path="/cartoes/:cardId/faturas" element={<CardInvoices />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />

@@ -32,13 +32,14 @@ interface Props {
   people?: string[];
   /** Realocacoes/divisoes lembradas de importacoes anteriores. */
   attribution?: AttributionMemory;
+  thirdParties?: ReadonlySet<string>;
 }
 
 type Conferencia = Pick<BradescoParseResult, 'totalFatura' | 'parsedTotal' | 'cardTotals' | 'dueDate'>;
 
 const sameCents = (a: number, b: number) => Math.abs(a - b) < 0.005;
 
-export function ImportPdfModal({ open, onClose, onConfirm, parsed, categoryOptions, suggest, knownKinds, people = [], attribution }: Props) {
+export function ImportPdfModal({ open, onClose, onConfirm, parsed, categoryOptions, suggest, knownKinds, people = [], attribution, thirdParties }: Props) {
   const [items, setItems] = useState<ReviewItem[]>([]);
   const [cards, setCards] = useState<InvoiceCard[]>([]);
   const [previousBalance, setPreviousBalance] = useState(0);
@@ -288,7 +289,7 @@ export function ImportPdfModal({ open, onClose, onConfirm, parsed, categoryOptio
                                       <Select value={item.assigned_to || item.holder_name} onValueChange={v => updateItemPerson(globalIdx, v)}>
                                         <SelectTrigger className={`h-8 text-xs w-[170px] ${item.assigned_to ? 'border-primary/60 text-primary' : ''}`}><SelectValue /></SelectTrigger>
                                         <SelectContent>
-                                          {personOptions.map(p => <SelectItem key={p} value={p}>{p}{p === person.name ? ' (titular)' : ''}</SelectItem>)}
+                                          {personOptions.map(p => <SelectItem key={p} value={p}>{p}{p === person.name ? ' (titular)' : thirdParties?.has(p) ? ' (terceiro)' : ''}</SelectItem>)}
                                         </SelectContent>
                                       </Select>
                                     </TableCell>

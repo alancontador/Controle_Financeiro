@@ -10,6 +10,7 @@ const pct = (share: number) => `${Math.round(share * 100)}%`;
 interface Props {
   people: PersonSpend[];
   invoiceLabel: string | null;
+  thirdParties?: ReadonlySet<string>;
 }
 
 /**
@@ -17,7 +18,7 @@ interface Props {
  * virtual, adicional), com o gasto de cada um na fatura mais recente e a
  * fatia de cada pessoa.
  */
-export function CardPeopleBreakdown({ people, invoiceLabel }: Props) {
+export function CardPeopleBreakdown({ people, invoiceLabel, thirdParties }: Props) {
   if (people.length === 0) {
     return <p className="text-sm text-muted-foreground mt-3">Importe uma fatura para ver os gastos por pessoa e por cartão.</p>;
   }
@@ -31,7 +32,7 @@ export function CardPeopleBreakdown({ people, invoiceLabel }: Props) {
       {people.map((p) => (
         <div key={p.person} className="rounded-lg border border-border/60 p-3">
           <div className="flex items-center justify-between mb-1">
-            <span className="font-medium text-sm">{p.person}</span>
+            <span className="font-medium text-sm">{p.person}{thirdParties?.has(p.person) && <span className="text-xs text-muted-foreground font-normal"> (terceiro · a receber)</span>}</span>
             <span className="text-sm font-semibold">{fmt(p.total)} <span className="text-xs text-muted-foreground font-normal">({pct(p.share)})</span></span>
           </div>
           <Progress value={p.share * 100} className="h-1.5 mb-2" />

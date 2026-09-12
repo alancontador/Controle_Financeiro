@@ -18,6 +18,7 @@ interface Props {
   item: InvoiceItem | null;
   current: Share[];
   people: string[];
+  thirdParties?: ReadonlySet<string>;
   onClose: () => void;
   onSave: (shares: Share[]) => Promise<boolean>;
 }
@@ -26,7 +27,7 @@ interface Props {
  * Divide o valor de uma compra entre pessoas. Marca quem participa, ajusta os
  * valores (ou "Igualmente"), e a soma tem que fechar ao centavo com a compra.
  */
-export function SplitItemDialog({ item, current, people, onClose, onSave }: Props) {
+export function SplitItemDialog({ item, current, people, thirdParties, onClose, onSave }: Props) {
   const amount = Number(item?.amount ?? 0);
   const candidates = useMemo(() => [...new Set([item?.holder_name ?? '', ...people].filter(Boolean))], [item, people]);
   const [selected, setSelected] = useState<string[]>([]);
@@ -79,7 +80,9 @@ export function SplitItemDialog({ item, current, people, onClose, onSave }: Prop
             return (
               <div key={person} className="flex items-center gap-3">
                 <Checkbox checked={on} onCheckedChange={(v) => toggle(person, v === true)} id={`split-${person}`} />
-                <label htmlFor={`split-${person}`} className="flex-1 text-sm truncate">{person}</label>
+                <label htmlFor={`split-${person}`} className="flex-1 text-sm truncate">
+                  {person}{thirdParties?.has(person) ? <span className="text-xs text-muted-foreground"> (terceiro)</span> : ''}
+                </label>
                 <Input
                   className="w-32 h-8 text-right"
                   value={on ? values[person] ?? '' : ''}

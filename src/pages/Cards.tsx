@@ -14,6 +14,7 @@ import { UpcomingInvoices } from '@/components/cards/UpcomingInvoices';
 import { CardPeopleBreakdown } from '@/components/cards/CardPeopleBreakdown';
 import { WhoSpendsMore } from '@/components/cards/WhoSpendsMore';
 import { useCardPeople } from '@/hooks/useCardPeople';
+import { usePeople } from '@/hooks/usePeople';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -25,6 +26,7 @@ const Cards = () => {
   const navigate = useNavigate();
   const { cards, loading, openInvoiceTotals, usage, createCard, updateCard, deleteCard } = useCreditCards();
   const { byCard, overall, refetch: refetchPeople } = useCardPeople();
+  const { thirdParties } = usePeople();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingCard, setEditingCard] = useState<CreditCardType | null>(null);
   const [deletingCard, setDeletingCard] = useState<CreditCardType | null>(null);
@@ -100,6 +102,7 @@ const Cards = () => {
                 <CardPeopleBreakdown
                   people={byCard[card.id]?.people ?? []}
                   invoiceLabel={byCard[card.id]?.invoiceLabel ?? null}
+                  thirdParties={thirdParties}
                 />
               </motion.div>
             ))}
@@ -108,7 +111,7 @@ const Cards = () => {
 
         {cards.length > 0 && (
           <div className="mt-8 space-y-6">
-            <WhoSpendsMore overall={overall} />
+            <WhoSpendsMore overall={overall} thirdParties={thirdParties} />
             <UpcomingInvoices />
           </div>
         )}

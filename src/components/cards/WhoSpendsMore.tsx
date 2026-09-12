@@ -6,7 +6,7 @@ import type { PersonSpend } from '@/hooks/useCardPeople';
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 /** Faixa "Quem esta gastando mais": consolidado das faturas mais recentes de todos os cartoes, por pessoa. */
-export function WhoSpendsMore({ overall }: { overall: PersonSpend[] }) {
+export function WhoSpendsMore({ overall, thirdParties }: { overall: PersonSpend[]; thirdParties?: ReadonlySet<string> }) {
   if (overall.length === 0) return null;
   const grand = overall.reduce((s, p) => s + p.total, 0);
   return (
@@ -21,7 +21,7 @@ export function WhoSpendsMore({ overall }: { overall: PersonSpend[] }) {
         {overall.map((p, i) => (
           <div key={p.person} className={`rounded-lg p-3 border ${i === 0 ? 'border-primary/40 bg-primary/5' : 'border-border/60'}`}>
             <div className="flex items-center justify-between mb-1">
-              <span className="text-sm font-medium">{i === 0 ? '🥇 ' : ''}{p.person}</span>
+              <span className="text-sm font-medium">{i === 0 ? '🥇 ' : ''}{p.person}{thirdParties?.has(p.person) && <span className="text-xs text-muted-foreground font-normal"> (terceiro)</span>}</span>
               <span className="text-sm font-semibold">{fmt(p.total)}</span>
             </div>
             <Progress value={p.share * 100} className="h-1.5" />

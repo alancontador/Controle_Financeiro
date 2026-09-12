@@ -48,7 +48,7 @@ function cardFromHeader(parsed: BradescoParseResult): Partial<CardFormData> {
 export function ImportInvoiceFlow({ cards, createCard, onImported }: Props) {
   const { toast } = useToast();
   const { findCardByLastFour, findExistingInvoice, importInvoice, loadCategorization, loadKnownKinds, loadAttribution } = useInvoiceImport();
-  const { people } = usePeople();
+  const { names: people, thirdParties } = usePeople();
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [busy, setBusy] = useState(false);
@@ -201,6 +201,7 @@ export function ImportInvoiceFlow({ cards, createCard, onImported }: Props) {
         suggest={categorization?.suggest}
         knownKinds={knownKinds}
         people={people}
+        thirdParties={thirdParties}
         attribution={attribution}
         onClose={resetAll}
         onConfirm={handleConfirm}

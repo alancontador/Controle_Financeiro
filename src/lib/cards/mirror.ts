@@ -44,11 +44,18 @@ export function isPaymentLine(description: string): boolean {
   return RE_PAYMENT.test(description.replace(/\./g, ''));
 }
 
-export function itemToTransaction(item: MirrorableItem, userId: string): MirroredTransaction | null {
+/**
+ * @param thirdParties pessoas de fora da casa: a compra fica na fatura, mas
+ *   nao e despesa do usuario (ele recebe de volta) - vai para o controle de
+ *   recebiveis, nao para transactions.
+ */
+export function itemToTransaction(item: MirrorableItem, userId: string, thirdParties: ReadonlySet<string> = new Set()): MirroredTransaction | null {
   if (isPaymentLine(item.description)) return null;
+  const person = effectivePerson(item);
+  if (thirdParties.has(person)) return null;
   return {
     user_id: userId,
-    holder_name: effectivePerson(item),
+    holder_name: person,
     card_last_four: item.card_last_four,
     description: item.description,
     amount: item.amount,

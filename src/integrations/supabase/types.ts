@@ -421,7 +421,15 @@ export type Database = {
           amount?: number
           created_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "invoice_item_splits_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "invoice_items"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       invoice_items: {
         Row: {
@@ -525,6 +533,63 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      people: {
+        Row: {
+          id: string
+          user_id: string
+          name: string
+          kind: string
+          notes: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          name: string
+          kind?: string
+          notes?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          name?: string
+          kind?: string
+          notes?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      person_payments: {
+        Row: {
+          id: string
+          user_id: string
+          person: string
+          amount: number
+          date: string
+          notes: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          person: string
+          amount: number
+          date?: string
+          notes?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          person?: string
+          amount?: number
+          date?: string
+          notes?: string | null
+          created_at?: string
+        }
+        Relationships: []
       }
       portfolio_history: {
         Row: {

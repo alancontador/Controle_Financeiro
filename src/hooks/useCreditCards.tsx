@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { computeCardUsage, type CardUsage } from '@/lib/cards/usage';
 import { itemToTransaction, MIRROR_NOTE } from '@/lib/cards/mirror';
+import { loadThirdPartySet } from '@/hooks/usePeople';
 import type { Share } from '@/lib/cards/split';
 import { attributionKeys, fractionsFromShares } from '@/lib/cards/attribution';
 import type { Json } from '@/integrations/supabase/types';
@@ -269,14 +270,16 @@ export function useInvoices(cardId: string) {
     }
 
     // Re-espelha: apaga as despesas do item e grava uma por parte (ou uma so, sem divisao).
+    // Partes de terceiros nao viram despesa: ficam no controle de recebiveis.
+    const thirdParties = await loadThirdPartySet(userId);
     await supabase.from('transactions').delete().eq('invoice_item_id', item.id);
-    const base = itemToTransaction(item, userId);
-    if (base) {
-      const rows = shares.length > 0
-        ? shares.map((s) => ({ ...base, holder_name: s.person, amount: s.amount, notes: `${MIRROR_NOTE} · dividido` }))
-        : [base];
-      await supabase.from('transactions').insert(rows);
-    }
+    const rows = shares.length > 0
+      ? (() => {
+          const base = itemToTransaction({ ...item, amount: Number(item.amount), assigned_to: null }, userId);
+          return base ? shares.filter((s) => !thirdParties.has(s.person)).map((s) => ({ ...base, holder_name: s.person, amount: s.amount, notes: `${MIRROR_NOTE} · dividido` })) : [];
+        })()
+      : (() => { const t = itemToTransaction({ ...item, amount: Number(item.amount) }, userId, thirdParties); return t ? [t] : []; })();
+    if (rows.length) await supabase.from('transactions').insert(rows);
 
     await rememberAttribution(item, shares.length > 0 ? { shares } : null);
     setSplits((prev) => {
@@ -360,7 +363,13 @@ export function useInvoices(cardId: string) {
       toast({ title: 'Erro ao realocar', description: error.message, variant: 'destructive' });
       return false;
     }
-    await supabase.from('transactions').update({ holder_name: assigned ?? item.holder_name }).eq('invoice_item_id', item.id);
+    // Re-espelha: terceiro nao tem despesa (fica em recebiveis); pessoa da casa tem uma.
+    const { data: auth } = await supabase.auth.getUser();
+    const userId = auth.user?.id ?? '';
+    const thirdParties = await loadThirdPartySet(userId);
+    const mirrored = itemToTransaction({ ...item, amount: Number(item.amount), assigned_to: assigned }, userId, thirdParties);
+    await supabase.from('transactions').delete().eq('invoice_item_id', item.id);
+    if (mirrored) await supabase.from('transactions').insert(mirrored);
     await rememberAttribution(item, assigned ? { assigned_to: assigned } : null);
     setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, assigned_to: assigned } : i)));
     toast({ title: assigned ? `Realocado para ${assigned}` : `De volta para ${item.holder_name}` });

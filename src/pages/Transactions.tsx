@@ -39,7 +39,7 @@ const Transactions = () => {
     deleteTransaction,
     importTransactions,
   } = useTransactions();
-  const { people } = usePeople();
+  const { names: people } = usePeople();
 
   const {
     recurringTransactions,

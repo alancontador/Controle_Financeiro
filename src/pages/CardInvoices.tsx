@@ -37,7 +37,7 @@ const CardInvoices = () => {
     splits, setItemSplits,
   } = useInvoices(cardId || '');
   const [splittingItem, setSplittingItem] = useState<InvoiceItem | null>(null);
-  const { people: householdPeople } = usePeople();
+  const { names: householdPeople, thirdParties } = usePeople();
   const { usage: usageByCard } = useCreditCards();
 
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string>('');
@@ -336,7 +336,7 @@ const CardInvoices = () => {
                                                 </SelectTrigger>
                                                 <SelectContent>
                                                   {[...new Set([item.holder_name, ...householdPeople])].map((p) => (
-                                                    <SelectItem key={p} value={p}>{p}{p === item.holder_name ? ' (titular do cartão)' : ''}</SelectItem>
+                                                    <SelectItem key={p} value={p}>{p}{p === item.holder_name ? ' (titular do cartão)' : thirdParties.has(p) ? ' (terceiro)' : ''}</SelectItem>
                                                   ))}
                                                 </SelectContent>
                                               </Select>
@@ -408,6 +408,7 @@ const CardInvoices = () => {
           item={splittingItem}
           current={splittingItem ? splits[splittingItem.id] ?? [] : []}
           people={householdPeople}
+          thirdParties={thirdParties}
           onClose={() => setSplittingItem(null)}
           onSave={(shares) => (splittingItem ? setItemSplits(splittingItem, shares) : Promise.resolve(false))}
         />

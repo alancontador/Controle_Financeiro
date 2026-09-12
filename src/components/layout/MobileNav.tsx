@@ -16,6 +16,7 @@ import {
   X,
   Tag,
   CreditCard,
+  Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -34,6 +35,7 @@ const navItems: NavItem[] = [
   { icon: Wallet, label: "Orçamentos", href: "/budgets" },
   { icon: Tag, label: "Categorias", href: "/categories" },
   { icon: CreditCard, label: "Cartões", href: "/cartoes" },
+  { icon: Users, label: "Pessoas", href: "/pessoas" },
   { icon: TrendingUp, label: "Investimentos", href: "/investments" },
   { icon: Target, label: "Metas", href: "/goals" },
   { icon: FileText, label: "Relatórios", href: "/reports" },

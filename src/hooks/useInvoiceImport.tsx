@@ -12,6 +12,7 @@ import type { BradescoHeader, BradescoItem } from '@/lib/pdf/bradesco';
 import type { CardKind, InvoiceCard } from '@/lib/cards/kinds';
 import { attributionKeys, resolveAttribution, sharesFromFractions, type Attribution, type AttributionMemory } from '@/lib/cards/attribution';
 import { MIRROR_NOTE } from '@/lib/cards/mirror';
+import { loadThirdPartySet } from '@/hooks/usePeople';
 import type { CreditCard, Invoice } from '@/hooks/useCreditCards';
 
 export interface ImportableItem extends BradescoItem {
@@ -274,11 +275,17 @@ export function useInvoiceImport() {
         );
       }
 
+      // Compras de terceiros ficam na fatura, mas nao sao despesa do usuario (vao para recebiveis).
+      const thirdParties = await loadThirdPartySet(user.id);
       const mirrored = (inserted ?? []).flatMap((row) => {
-        const base = itemToTransaction(row, user.id);
-        if (!base) return [];
         const shares = splitByRowId.get(row.id);
-        return shares ? shares.map((s) => ({ ...base, holder_name: s.person, amount: s.amount, notes: `${MIRROR_NOTE} · dividido` })) : [base];
+        if (shares) {
+          const base = itemToTransaction({ ...row, assigned_to: null }, user.id);
+          if (!base) return [];
+          return shares.filter((s) => !thirdParties.has(s.person)).map((s) => ({ ...base, holder_name: s.person, amount: s.amount, notes: `${MIRROR_NOTE} · dividido` }));
+        }
+        const base = itemToTransaction(row, user.id, thirdParties);
+        return base ? [base] : [];
       });
       if (mirrored.length > 0) {
         const { error: txError } = await supabase.from('transactions').insert(mirrored);
