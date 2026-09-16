@@ -8,6 +8,9 @@ declare global {
     __env?: {
       VITE_SUPABASE_URL?: string;
       VITE_SUPABASE_PUBLISHABLE_KEY?: string;
+      // Canal humano do painel de ajuda (src/lib/help/support-contact.ts)
+      VITE_SUPPORT_EMAIL?: string;
+      VITE_SUPPORT_WHATSAPP?: string;
     };
   }
 }

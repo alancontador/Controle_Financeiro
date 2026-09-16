@@ -27,6 +27,8 @@ O app sobe em `http://localhost:8080`.
 | `VITE_SUPABASE_URL` | URL do projeto Supabase |
 | `VITE_SUPABASE_PUBLISHABLE_KEY` | Chave publica (anon) do Supabase |
 | `VITE_SUPABASE_PROJECT_ID` | ID do projeto Supabase |
+| `VITE_SUPPORT_WHATSAPP` | (opcional) numero com DDI, so digitos, para o botao "Falar no WhatsApp" na Central de ajuda |
+| `VITE_SUPPORT_EMAIL` | (opcional) e-mail para o botao "Enviar e-mail" na Central de ajuda |
 
 Em desenvolvimento elas vem do `.env` (via Vite). Em producao o container gera
 `env-config.js` em runtime a partir das variaveis do ambiente, e o app le de
@@ -58,6 +60,7 @@ A funcao `process-recurring-transactions` roda diariamente por `pg_cron`
 | Funcao | O que faz |
 |---|---|
 | `analyze-finances` | Gera insights financeiros com IA a partir das transacoes e orcamentos |
+| `support-chat` | Chat de suporte (botao "?"): responde com o Gemini a partir de `_shared/help-content.ts`, que tambem alimenta os guias e o FAQ do painel |
 | `fetch-quotes` | Busca cotacoes para o modulo de investimentos |
 | `process-recurring-transactions` | Materializa transacoes recorrentes |
 
@@ -65,7 +68,7 @@ Deploy: `supabase functions deploy <nome>`.
 
 ### Secrets das funcoes
 
-`analyze-finances` usa a API do Gemini (Google AI Studio, camada gratuita):
+`analyze-finances` e `support-chat` usam a API do Gemini (Google AI Studio, camada gratuita):
 
 | Secret | Obrigatorio | Descricao |
 |---|---|---|
