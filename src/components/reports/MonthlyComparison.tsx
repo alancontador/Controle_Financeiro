@@ -60,11 +60,11 @@ export function MonthlyComparison({ currentMonth, previousMonths }: MonthlyCompa
 
   return (
     <Card className="glass-card">
-      <CardHeader className="flex flex-row items-center justify-between">
+      <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
         <CardTitle className="text-foreground text-lg">Comparativo Mensal</CardTitle>
         {variation !== null && (
           <div
-            className={`flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium ${
+            className={`flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium whitespace-nowrap shrink-0 ${
               variation > 0
                 ? "bg-destructive/10 text-destructive"
                 : variation < 0

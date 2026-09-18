@@ -16,6 +16,8 @@ import { CategoryBreakdown } from "@/hooks/useDashboardStats";
 
 interface ExpensesByCategoryProps {
   data: CategoryBreakdown[];
+  /** Ex.: "agosto de 2026". Padrao: "Este mês". */
+  subtitle?: string;
 }
 
 const iconMap: Record<string, React.ElementType> = {
@@ -47,7 +49,7 @@ const CustomTooltip = ({ active, payload }: any) => {
   return null;
 };
 
-export function ExpensesByCategory({ data }: ExpensesByCategoryProps) {
+export function ExpensesByCategory({ data, subtitle }: ExpensesByCategoryProps) {
   const chartData = data.map((item) => ({
     name: item.name,
     value: item.amount,
@@ -71,7 +73,7 @@ export function ExpensesByCategory({ data }: ExpensesByCategoryProps) {
         </div>
         <div>
           <h3 className="text-foreground font-semibold text-lg">Despesas por Categoria</h3>
-          <p className="text-muted-foreground text-sm">Este mês</p>
+          <p className="text-muted-foreground text-sm capitalize">{subtitle ?? "Este mês"}</p>
         </div>
       </div>
 

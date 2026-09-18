@@ -136,7 +136,7 @@ const Index = () => {
         {/* Main Content Grid - Responsive */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6 mb-6">
           <BalanceChart data={monthlyChartData} balanceEvolution={balanceEvolution} />
-          <ExpensesByCategory data={expensesByCategory} />
+          <ExpensesByCategory data={expensesByCategory} subtitle={format(month, "MMMM 'de' yyyy", { locale: ptBR })} />
         </div>
 
         {/* Secondary Content Grid - Responsive */}

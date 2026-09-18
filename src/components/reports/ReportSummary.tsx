@@ -18,7 +18,8 @@ export function ReportSummary({ currentMonth, previousMonth }: ReportSummaryProp
 
   const getVariation = (current: number, previous: number) => {
     if (previous === 0) return null;
-    return ((current - previous) / previous) * 100;
+    // Divide pelo modulo: saldo de -1.000 que foi para -3.000 e -200%, nao +200%.
+    return ((current - previous) / Math.abs(previous)) * 100;
   };
 
   const stats = [

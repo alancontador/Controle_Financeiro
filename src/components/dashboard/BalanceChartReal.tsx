@@ -20,6 +20,14 @@ interface BalanceChartProps {
   balanceEvolution: { date: string; balance: number; label: string }[];
 }
 
+/** Eixo em R$ legivel e sem repetir ("3k, 3k"): 850 -> "850", 2500 -> "2,5 mil", 12000 -> "12 mil". */
+const fmtAxis = (value: number) => {
+  const abs = Math.abs(value);
+  if (abs < 1000) return value.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
+  const mil = value / 1000;
+  return `${mil.toLocaleString("pt-BR", { maximumFractionDigits: Number.isInteger(mil) || abs >= 10000 ? 0 : 1 })} mil`;
+};
+
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     const data = payload[0]?.payload;
@@ -110,7 +118,7 @@ export function BalanceChart({ data, balanceEvolution }: BalanceChartProps) {
             <span className="text-muted-foreground text-xs">Total Receitas</span>
           </div>
           <p className="text-accent font-bold">
-            R$ {totalReceitas.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
+            R$ {totalReceitas.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
           </p>
         </div>
         <div className="p-3 rounded-lg bg-destructive/5 border border-destructive/20">
@@ -119,7 +127,7 @@ export function BalanceChart({ data, balanceEvolution }: BalanceChartProps) {
             <span className="text-muted-foreground text-xs">Total Despesas</span>
           </div>
           <p className="text-destructive font-bold">
-            R$ {totalDespesas.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
+            R$ {totalDespesas.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
           </p>
         </div>
         <div className={`p-3 rounded-lg border ${totalSaldo >= 0 ? 'bg-primary/5 border-primary/20' : 'bg-destructive/5 border-destructive/20'}`}>
@@ -128,7 +136,7 @@ export function BalanceChart({ data, balanceEvolution }: BalanceChartProps) {
             <span className="text-muted-foreground text-xs">Saldo</span>
           </div>
           <p className={`font-bold ${totalSaldo >= 0 ? 'text-primary' : 'text-destructive'}`}>
-            R$ {totalSaldo.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
+            R$ {totalSaldo.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
           </p>
         </div>
       </div>
@@ -166,7 +174,7 @@ export function BalanceChart({ data, balanceEvolution }: BalanceChartProps) {
                 axisLine={false}
                 tickLine={false}
                 tick={{ fill: "hsl(240 5% 65%)", fontSize: 12 }}
-                tickFormatter={(value) => value >= 1000 ? `${(value / 1000).toFixed(0)}k` : value.toString()}
+                tickFormatter={fmtAxis}
               />
               <Tooltip content={<CustomTooltip />} />
               <Area
@@ -211,7 +219,7 @@ export function BalanceChart({ data, balanceEvolution }: BalanceChartProps) {
                 axisLine={false}
                 tickLine={false}
                 tick={{ fill: "hsl(240 5% 65%)", fontSize: 12 }}
-                tickFormatter={(value) => value >= 1000 ? `${(value / 1000).toFixed(0)}k` : value.toString()}
+                tickFormatter={fmtAxis}
               />
               <Tooltip content={<BalanceTooltip />} />
               <Line
