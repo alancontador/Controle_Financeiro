@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useDataChanged } from '@/lib/dataEvents';
+import { monthlyRecurringIncome, type ForecastRecurring } from '@/lib/recurring';
 import { projectUpcomingInvoices, projectUpcomingInvoicesByPerson, type MonthProjection, type ProjectionItem } from '@/lib/cards/projection';
 import { addMonths, monthKey, toIsoDate } from '@/lib/dates';
 import { personShares, type Share } from '@/lib/cards/split';
@@ -44,9 +45,10 @@ export function useUpcomingInvoices(cardId?: string, months = 6): UpcomingInvoic
     if (cardId) query = query.eq('invoice.card_id', cardId);
 
     const threeMonthsAgo = addMonths(toIsoDate(new Date()), -3);
-    const [itemsRes, incomeRes] = await Promise.all([
+    const [itemsRes, incomeRes, recurringRes] = await Promise.all([
       query,
       supabase.from('transactions').select('amount').eq('user_id', user.id).eq('type', 'income').gte('date', threeMonthsAgo),
+      supabase.from('recurring_transactions').select('id, description, amount, type, frequency, next_execution_date, day_of_month, end_date, installments_total, installments_done, is_active').eq('user_id', user.id).eq('is_active', true).eq('type', 'income'),
     ]);
 
     const rows = itemsRes.data ?? [];
@@ -74,13 +76,15 @@ export function useUpcomingInvoices(cardId?: string, months = 6): UpcomingInvoic
     setByPerson(projectUpcomingInvoicesByPerson(items, { months }));
     setCommittedNext3(round2(proj.slice(0, 3).reduce((s, m) => s + m.committed, 0)));
     const income = (incomeRes.data ?? []).reduce((s, t) => s + Number(t.amount), 0);
-    setAvgIncome3(round2(income / 3));
+    // Sem receita lancada nos ultimos 3 meses, a renda recorrente cadastrada (salario) serve de base.
+    const recurringIncome = monthlyRecurringIncome((recurringRes.data ?? []).map((r) => ({ ...r, amount: Number(r.amount) }) as ForecastRecurring));
+    setAvgIncome3(income > 0 ? round2(income / 3) : recurringIncome);
     setLoading(false);
     hasLoaded.current = true;
   }, [user, cardId, months]);
 
   useEffect(() => { fetch(); }, [fetch]);
-  useDataChanged(fetch, ['cards', 'people']);
+  useDataChanged(fetch, ['cards', 'people', 'recurring', 'transactions']);
 
   return { projection, byPerson, committedNext3, avgIncome3, loading, refetch: fetch };
 }

@@ -9,6 +9,10 @@ interface StatCardProps {
   changeType?: "positive" | "negative" | "neutral";
   icon: LucideIcon;
   delay?: number;
+  /** Linha auxiliar abaixo do valor (ex.: previsto, acumulado). */
+  hint?: string;
+  /** Explicacao no hover. */
+  title_hint?: string;
 }
 
 export function StatCard({ 
@@ -17,7 +21,9 @@ export function StatCard({
   change, 
   changeType = "neutral", 
   icon: Icon,
-  delay = 0 
+  delay = 0,
+  hint,
+  title_hint,
 }: StatCardProps) {
   return (
     <motion.div
@@ -25,7 +31,8 @@ export function StatCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay, duration: 0.4, ease: "easeOut" }}
       whileHover={{ y: -4, transition: { duration: 0.2 } }}
-      className="glass-card rounded-xl p-4 lg:p-6 hover:border-primary/30 hover:glow-primary transition-all duration-250"
+      className="glass-card rounded-xl p-4 lg:p-6 hover:border-primary/30 hover:glow-primary transition-all duration-250 min-w-0"
+      title={title_hint}
     >
       <div className="flex items-start justify-between mb-3 lg:mb-4">
         <div className="p-2 lg:p-3 rounded-lg bg-primary/10 border border-primary/20">
@@ -46,7 +53,8 @@ export function StatCard({
       </div>
       
       <p className="text-muted-foreground text-xs lg:text-sm mb-1">{title}</p>
-      <p className="text-foreground text-lg lg:text-2xl font-bold tracking-tight">{value}</p>
+      <p className="text-foreground text-lg lg:text-2xl font-bold tracking-tight truncate">{value}</p>
+      {hint && <p className="text-muted-foreground text-[11px] lg:text-xs mt-1 truncate">{hint}</p>}
     </motion.div>
   );
 }

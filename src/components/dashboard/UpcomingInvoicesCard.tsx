@@ -72,11 +72,11 @@ export function UpcomingInvoicesCard() {
           <div>
             <div className="flex justify-between text-sm mb-1">
               <span className="text-muted-foreground">Parcelas nos próximos 3 meses × renda</span>
-              <span className={`font-semibold ${tone}`}>{ratio === null ? 'sem renda registrada' : `${pct}%`}</span>
+              <span className={`font-semibold ${tone}`}>{ratio === null ? 'sem renda cadastrada' : `${pct}%`}</span>
             </div>
             <Progress value={pct} className="h-2" />
             <p className="text-xs text-muted-foreground mt-1">
-              {fmt(committedNext3)} comprometidos{avgIncome3 > 0 ? ` · renda média ${fmt(avgIncome3)}/mês` : ''}
+              {fmt(committedNext3)} comprometidos{avgIncome3 > 0 ? ` · renda ${fmt(avgIncome3)}/mês` : ''}
             </p>
           </div>
         </div>
