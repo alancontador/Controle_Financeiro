@@ -78,7 +78,9 @@ export function useUpcomingInvoices(cardId?: string, months = 6): UpcomingInvoic
     const income = (incomeRes.data ?? []).reduce((s, t) => s + Number(t.amount), 0);
     // Sem receita lancada nos ultimos 3 meses, a renda recorrente cadastrada (salario) serve de base.
     const recurringIncome = monthlyRecurringIncome((recurringRes.data ?? []).map((r) => ({ ...r, amount: Number(r.amount) }) as ForecastRecurring));
-    setAvgIncome3(income > 0 ? round2(income / 3) : recurringIncome);
+    // A renda recorrente cadastrada (salario) e a melhor base para o futuro; a media dos
+    // ultimos 3 meses so vence quando ha receita avulsa maior que ela.
+    setAvgIncome3(Math.max(round2(income / 3), recurringIncome));
     setLoading(false);
     hasLoaded.current = true;
   }, [user, cardId, months]);
