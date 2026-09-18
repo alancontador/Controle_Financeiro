@@ -92,6 +92,16 @@ export function RecurringTransactionList({
                     {transaction.category && (
                       <span className="truncate">{transaction.category.name}</span>
                     )}
+                    {transaction.installments_total ? (
+                      <span className="px-1.5 py-0.5 bg-primary/10 text-primary rounded whitespace-nowrap">
+                        {transaction.installments_done}/{transaction.installments_total} parcelas
+                      </span>
+                    ) : transaction.end_date ? (
+                      <span className="whitespace-nowrap">até {new Date(transaction.end_date + "T00:00:00").toLocaleDateString("pt-BR")}</span>
+                    ) : null}
+                    {!transaction.is_active && transaction.installments_total && transaction.installments_done >= transaction.installments_total && (
+                      <span className="whitespace-nowrap">· concluída</span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -112,7 +122,7 @@ export function RecurringTransactionList({
                   </p>
                   <div className="flex items-center gap-1 text-xs text-muted-foreground">
                     <Calendar className="w-3 h-3" />
-                    <span>Próx: {new Date(transaction.next_execution_date).toLocaleDateString("pt-BR")}</span>
+                    <span>Próx: {new Date(transaction.next_execution_date + "T00:00:00").toLocaleDateString("pt-BR")}</span>
                   </div>
                 </div>
 
@@ -148,7 +158,7 @@ export function RecurringTransactionList({
             <div className="sm:hidden mt-3 pt-3 border-t border-border flex items-center justify-between">
               <div className="flex items-center gap-1 text-xs text-muted-foreground">
                 <Calendar className="w-3 h-3" />
-                <span>Próx: {new Date(transaction.next_execution_date).toLocaleDateString("pt-BR")}</span>
+                <span>Próx: {new Date(transaction.next_execution_date + "T00:00:00").toLocaleDateString("pt-BR")}</span>
               </div>
               <p
                 className={`font-semibold ${

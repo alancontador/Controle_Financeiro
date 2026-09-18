@@ -146,7 +146,7 @@ export default function Reports() {
       <Sidebar />
       <MobileNav />
 
-      <main className="lg:ml-64 min-h-screen">
+      <main className="lg:ml-[var(--sidebar-w,16rem)] transition-[margin] duration-200 min-h-screen">
         <div className="p-4 lg:p-8 pt-20 lg:pt-8">
           {/* Header */}
           <motion.div
@@ -168,9 +168,9 @@ export default function Reports() {
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               {/* Month Selector */}
-              <div className="flex items-center gap-2 bg-secondary/50 rounded-xl p-1">
+              <div className="flex items-center gap-1 bg-secondary/50 rounded-xl p-1">
                 <Button
                   variant="ghost"
                   size="icon"
@@ -180,7 +180,7 @@ export default function Reports() {
                   <ChevronLeft className="w-4 h-4" />
                 </Button>
 
-                <div className="flex items-center gap-2 px-3 min-w-[160px] justify-center">
+                <div className="flex items-center gap-2 px-2 min-w-[140px] justify-center">
                   <Calendar className="w-4 h-4 text-muted-foreground" />
                   <span className="text-foreground font-medium">
                     {format(selectedDate, "MMMM yyyy", { locale: ptBR })

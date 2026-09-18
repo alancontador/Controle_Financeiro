@@ -130,7 +130,7 @@ const Categories = () => {
       <Sidebar />
       <MobileNav />
 
-      <main className="lg:ml-64 p-4 lg:p-8 pt-20 lg:pt-8">
+      <main className="lg:ml-[var(--sidebar-w,16rem)] transition-[margin] duration-200 p-4 lg:p-8 pt-20 lg:pt-8">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -10 }}
@@ -291,6 +291,7 @@ const Categories = () => {
             </div>
           )}
         </motion.div>
+
       </main>
 
       {/* Modal */}

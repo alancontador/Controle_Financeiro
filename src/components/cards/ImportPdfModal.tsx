@@ -4,7 +4,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Upload, AlertCircle, CheckCircle2, XCircle } from 'lucide-react';
+import { Upload, AlertCircle, CheckCircle2, XCircle, Scissors } from 'lucide-react';
+import { SplitItemDialog } from '@/components/cards/SplitItemDialog';
+import { isPaymentLine } from '@/lib/cards/mirror';
+import { sharesFromFractions } from '@/lib/cards/attribution';
+import { applyPersonAliases } from '@/lib/people';
+import { loadAliasMap } from '@/hooks/usePeople';
+import { supabase } from '@/integrations/supabase/client';
+import type { Share } from '@/lib/cards/split';
 import { extractPdfLines } from '@/lib/pdf/extractText';
 import { parseInvoice, SUPPORTED_BANKS } from '@/lib/pdf/invoice';
 import type { ParsedItem, ParseResult } from '@/lib/pdf/types';
@@ -13,9 +20,19 @@ import { CARD_KINDS, CARD_KIND_LABEL, classifyInvoiceCards, type CardKind, type 
 import { resolveAttribution, type AttributionMemory } from '@/lib/cards/attribution';
 
 /** Item no formato que a tabela invoice_items espera. */
-export type ImportedInvoiceItem = ParsedItem & { is_previous_balance: boolean; assigned_to?: string | null };
+export type ImportedInvoiceItem = ParsedItem & { is_previous_balance: boolean; assigned_to?: string | null; split_shares?: Share[] };
 
-type ReviewItem = ParsedItem & { assigned_to?: string | null; remembered_split?: string };
+type ReviewItem = ParsedItem & {
+  assigned_to?: string | null;
+  /** Divisao lembrada de importacao anterior (texto para exibir e partes para editar). */
+  remembered_split?: string;
+  remembered_shares?: Share[];
+  /** Divisao feita aqui na revisao ([] = tirou a lembrada). */
+  split_shares?: Share[];
+};
+
+const shortName = (p: string) => p.split(' ')[0];
+const describeShares = (amount: number, shares: Share[]) => shares.map((s) => `${shortName(s.person)} ${Math.round((s.amount / amount) * 100)}%`).join(' · ');
 
 interface Props {
   open: boolean;
@@ -47,6 +64,7 @@ export function ImportPdfModal({ open, onClose, onConfirm, parsed, categoryOptio
   const [conferencia, setConferencia] = useState<Conferencia | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [splittingIdx, setSplittingIdx] = useState<number | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const reset = () => {
@@ -66,6 +84,7 @@ export function ImportPdfModal({ open, onClose, onConfirm, parsed, categoryOptio
         // Realocacao lembrada ja aparece na revisao; divisao lembrada e recriada ao confirmar.
         assigned_to: remembered?.assigned_to ?? null,
         remembered_split: remembered?.shares ? remembered.shares.map((s) => `${s.person.split(' ')[0]} ${Math.round(s.fraction * 100)}%`).join(' · ') : undefined,
+        remembered_shares: remembered?.shares ? sharesFromFractions(i.amount, remembered.shares) : undefined,
       };
     }));
     setCards(classifyInvoiceCards(result.header, knownKinds));
@@ -87,7 +106,9 @@ export function ImportPdfModal({ open, onClose, onConfirm, parsed, categoryOptio
 
     try {
       const lines = await extractPdfLines(await file.arrayBuffer());
-      const result = parseInvoice(lines);
+      const raw = parseInvoice(lines);
+      const { data: auth } = await supabase.auth.getUser();
+      const result = auth.user && !raw.error ? applyPersonAliases(raw, await loadAliasMap(auth.user.id)) : raw;
 
       if (result.error) {
         setError(result.error);
@@ -115,13 +136,17 @@ export function ImportPdfModal({ open, onClose, onConfirm, parsed, categoryOptio
     setItems(prev => prev.map((item, i) => i === index ? { ...item, assigned_to: person === item.holder_name ? null : person } : item));
   };
 
+  const updateItemSplit = (index: number, shares: Share[]) => {
+    setItems(prev => prev.map((item, i) => i === index ? { ...item, split_shares: shares, assigned_to: shares.length ? null : item.assigned_to } : item));
+  };
+
   const updateCardKind = (lastFour: string, kind: CardKind) => {
     setCards(prev => prev.map(c => c.lastFour === lastFour ? { ...c, kind } : c));
   };
 
   const handleConfirm = async () => {
     // Tira o campo auxiliar da revisao antes de entregar para gravacao.
-    const mapped: ImportedInvoiceItem[] = items.map(({ remembered_split: _hint, ...item }) => ({ ...item, is_previous_balance: false }));
+    const mapped: ImportedInvoiceItem[] = items.map(({ remembered_split: _hint, remembered_shares: _shares, ...item }) => ({ ...item, is_previous_balance: false }));
     setLoading(true);
     try {
       // Espera a gravacao terminar antes de fechar, para o erro (se houver) aparecer com o modal aberto.
@@ -282,17 +307,32 @@ export function ImportPdfModal({ open, onClose, onConfirm, parsed, categoryOptio
                                   </TableCell>
                                   {card.lastFour && (
                                     <TableCell>
-                                      {item.remembered_split && (
-                                        <span className="block text-[11px] text-primary mb-1" title="Divisão lembrada da importação anterior; será recriada ao confirmar">
-                                          ✂ {item.remembered_split}
-                                        </span>
+                                      {isPaymentLine(item.description) ? (
+                                        <span className="text-muted-foreground">-</span>
+                                      ) : item.split_shares && item.split_shares.length >= 2 ? (
+                                        <button type="button" onClick={() => setSplittingIdx(globalIdx)} className="text-xs text-left text-primary hover:underline flex items-center gap-1" title="Editar divisão">
+                                          <Scissors className="w-3 h-3 shrink-0" /><span>{describeShares(item.amount, item.split_shares)}</span>
+                                        </button>
+                                      ) : (
+                                        <>
+                                          {item.remembered_split && !item.split_shares && (
+                                            <span className="block text-[11px] text-primary mb-1" title="Divisão lembrada da importação anterior; será recriada ao confirmar">
+                                              ✂ {item.remembered_split}
+                                            </span>
+                                          )}
+                                          <span className="inline-flex items-center gap-1">
+                                            <Select value={item.assigned_to || item.holder_name} onValueChange={v => updateItemPerson(globalIdx, v)}>
+                                              <SelectTrigger className={`h-8 text-xs w-[150px] lg:w-[170px] ${item.assigned_to ? 'border-primary/60 text-primary' : ''}`}><SelectValue /></SelectTrigger>
+                                              <SelectContent>
+                                                {personOptions.map(p => <SelectItem key={p} value={p}>{p}{p === person.name ? ' (titular)' : thirdParties?.has(p) ? ' (terceiro)' : ''}</SelectItem>)}
+                                              </SelectContent>
+                                            </Select>
+                                            <button type="button" onClick={() => setSplittingIdx(globalIdx)} className="inline-flex items-center text-muted-foreground hover:text-primary" title="Dividir entre pessoas" aria-label="Dividir entre pessoas">
+                                              <Scissors className="w-3.5 h-3.5" />
+                                            </button>
+                                          </span>
+                                        </>
                                       )}
-                                      <Select value={item.assigned_to || item.holder_name} onValueChange={v => updateItemPerson(globalIdx, v)}>
-                                        <SelectTrigger className={`h-8 text-xs w-[170px] ${item.assigned_to ? 'border-primary/60 text-primary' : ''}`}><SelectValue /></SelectTrigger>
-                                        <SelectContent>
-                                          {personOptions.map(p => <SelectItem key={p} value={p}>{p}{p === person.name ? ' (titular)' : thirdParties?.has(p) ? ' (terceiro)' : ''}</SelectItem>)}
-                                        </SelectContent>
-                                      </Select>
                                     </TableCell>
                                   )}
                                 </TableRow>
@@ -317,6 +357,15 @@ export function ImportPdfModal({ open, onClose, onConfirm, parsed, categoryOptio
           </>
         )}
       </DialogContent>
+
+      <SplitItemDialog
+        item={splittingIdx !== null ? items[splittingIdx] ?? null : null}
+        current={splittingIdx !== null ? (items[splittingIdx]?.split_shares ?? items[splittingIdx]?.remembered_shares ?? []) : []}
+        people={people}
+        thirdParties={thirdParties}
+        onClose={() => setSplittingIdx(null)}
+        onSave={async (shares) => { if (splittingIdx !== null) updateItemSplit(splittingIdx, shares); return true; }}
+      />
     </Dialog>
   );
 }

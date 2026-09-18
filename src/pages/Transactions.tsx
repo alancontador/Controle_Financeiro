@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Plus, Loader2, ArrowUpRight, ArrowDownRight, Upload, Download, RefreshCw } from "lucide-react";
@@ -21,7 +22,7 @@ import { TransactionList } from "@/components/transactions/TransactionList";
 import { TransactionModal } from "@/components/transactions/TransactionModal";
 import { DeleteConfirmModal } from "@/components/transactions/DeleteConfirmModal";
 import { ImportModal } from "@/components/transactions/ImportModal";
-import { RecurringTransactionModal } from "@/components/transactions/RecurringTransactionModal";
+import { RecurringTransactionModal, type SubmitData as RecurringSubmitData } from "@/components/transactions/RecurringTransactionModal";
 import { RecurringTransactionList } from "@/components/transactions/RecurringTransactionList";
 import { exportTransactions } from "@/utils/exportTransactions";
 
@@ -39,6 +40,13 @@ const Transactions = () => {
     deleteTransaction,
     importTransactions,
   } = useTransactions();
+  // Busca vinda do cabecalho do dashboard (/transactions?q=termo).
+  const [searchParams] = useSearchParams();
+  const q = searchParams.get("q") ?? "";
+  useEffect(() => {
+    if (q) setFilters((f) => ({ ...f, search: q }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q]);
   const { names: people } = usePeople();
 
   const {
@@ -154,18 +162,7 @@ const Transactions = () => {
   };
 
   // Recurring transaction handlers
-  const handleRecurringSubmit = async (data: {
-    description: string;
-    amount: number;
-    type: "income" | "expense";
-    category_id: string | null;
-    frequency: "daily" | "weekly" | "monthly" | "yearly";
-    day_of_month: number | null;
-    day_of_week: number | null;
-    next_execution_date: string;
-    notes: string | null;
-    is_active: boolean;
-  }) => {
+  const handleRecurringSubmit = async (data: RecurringSubmitData) => {
     setIsSubmitting(true);
     try {
       if (editingRecurring) {
@@ -206,7 +203,7 @@ const Transactions = () => {
       <Sidebar />
       <MobileNav />
 
-      <main className="lg:ml-64 p-4 lg:p-8 pt-20 lg:pt-8">
+      <main className="lg:ml-[var(--sidebar-w,16rem)] transition-[margin] duration-200 p-4 lg:p-8 pt-20 lg:pt-8">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -10 }}

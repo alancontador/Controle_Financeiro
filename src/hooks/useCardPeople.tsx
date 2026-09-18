@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useDataChanged } from '@/lib/dataEvents';
 import { personShares, type Share } from '@/lib/cards/split';
 import type { CardKind } from '@/lib/cards/kinds';
 
@@ -43,10 +44,12 @@ export function useCardPeople(): CardPeopleData {
   const [byCard, setByCard] = useState<CardPeopleData['byCard']>({});
   const [overall, setOverall] = useState<PersonSpend[]>([]);
   const [loading, setLoading] = useState(true);
+  // Primeira carga mostra o loading; as atualizacoes por evento sao silenciosas (sem piscar).
+  const hasLoaded = useRef(false);
 
   const fetch = useCallback(async () => {
     if (!user) return;
-    setLoading(true);
+    if (!hasLoaded.current) setLoading(true);
 
     const [invoicesRes, holdersRes] = await Promise.all([
       supabase.from('invoices').select('id, card_id, period_end').order('period_end', { ascending: false }),
@@ -119,9 +122,11 @@ export function useCardPeople(): CardPeopleData {
     setOverall(all.map((p) => ({ ...p, share: grandAll > 0 ? round2(p.total / grandAll) : 0 })).sort((a, b) => b.total - a.total));
     setByCard(result);
     setLoading(false);
+    hasLoaded.current = true;
   }, [user]);
 
   useEffect(() => { fetch(); }, [fetch]);
+  useDataChanged(fetch, ['cards', 'people']);
 
   return { byCard, overall, loading, refetch: fetch };
 }

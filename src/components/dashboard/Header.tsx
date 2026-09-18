@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Plus, Bell, Search } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Plus, Search } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -17,6 +17,14 @@ export function Header() {
   const { categories, addTransaction } = useTransactions();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [search, setSearch] = useState("");
+  const navigate = useNavigate();
+  // A busca do cabecalho abre as transacoes ja filtradas pelo termo.
+  const submitSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    const q = search.trim();
+    navigate(q ? `/transactions?q=${encodeURIComponent(q)}` : "/transactions");
+  };
   
   const currentDate = new Date().toLocaleDateString('pt-BR', {
     weekday: 'long',
@@ -59,30 +67,28 @@ export function Header() {
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
-        className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-6 lg:mb-8 gap-4"
+        className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-6 lg:mb-8 gap-4 min-w-0"
       >
-        <div>
+        <div className="min-w-0">
           <h1 className="text-foreground text-xl lg:text-2xl font-bold tracking-tight">
             Bem-vindo, <span className="text-gradient capitalize">{userName}</span>
           </h1>
           <p className="text-muted-foreground text-xs lg:text-sm capitalize mt-1">{currentDate}</p>
         </div>
 
-        <div className="flex items-center gap-2 lg:gap-4">
-          <div className="relative flex-1 lg:flex-none">
+        <div className="flex items-center gap-2 lg:gap-3 min-w-0">
+          <form onSubmit={submitSearch} className="relative flex-1 lg:flex-none min-w-0">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input 
-              placeholder="Buscar..."
-              className="pl-10 w-full lg:w-64 bg-secondary border-border focus:border-primary"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar transação..."
+              aria-label="Buscar transação"
+              className="pl-10 w-full lg:w-44 xl:w-64 bg-secondary border-border focus:border-primary"
             />
-          </div>
+          </form>
 
           <ThemeToggle />
-          
-          <button className="relative p-2 rounded-lg bg-secondary hover:bg-muted transition-colors shrink-0">
-            <Bell className="w-5 h-5 text-muted-foreground" />
-            <span className="absolute top-1 right-1 w-2 h-2 bg-primary rounded-full" />
-          </button>
 
           <Button 
             onClick={() => setIsModalOpen(true)}

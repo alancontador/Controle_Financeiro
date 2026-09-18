@@ -151,3 +151,8 @@
     letter-spacing: -0.025em;
   }
 }
+
+/* Nada na pagina pode rolar para os lados: tabelas largas rolam dentro do proprio card. */
+html, body {
+  overflow-x: clip;
+}

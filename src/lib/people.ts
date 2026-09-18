@@ -5,6 +5,37 @@
  * honesta e o gasto da casa aparecer separado.
  */
 
+/** Nome impresso na fatura -> nome escolhido pelo usuario (apelidos cadastrados em people). */
+export type AliasMap = ReadonlyMap<string, string>;
+
+const aliasKey = (n: string) => n.trim().toUpperCase().replace(/\s+/g, ' ');
+
+export function buildAliasMap(people: { name: string; aliases?: string[] | null }[]): AliasMap {
+  const map = new Map<string, string>();
+  for (const p of people) for (const a of p.aliases ?? []) if (a?.trim()) map.set(aliasKey(a), p.name);
+  return map;
+}
+
+export function canonicalPerson(name: string, aliases: AliasMap): string {
+  return aliases.get(aliasKey(name)) ?? name;
+}
+
+/** Troca os nomes da fatura lida pelos nomes que o usuario escolheu (renomeou em Pessoas). */
+export function applyPersonAliases<T extends { header: { holders: string[]; cards: { holder: string; lastFour: string }[] }; items: { holder_name: string }[]; cardTotals: { holder: string }[] }>(result: T, aliases: AliasMap): T {
+  if (aliases.size === 0) return result;
+  const c = (n: string) => canonicalPerson(n, aliases);
+  return {
+    ...result,
+    header: {
+      ...result.header,
+      holders: [...new Set(result.header.holders.map(c))],
+      cards: result.header.cards.map((k) => ({ ...k, holder: c(k.holder) })),
+    },
+    items: result.items.map((i) => ({ ...i, holder_name: c(i.holder_name) })),
+    cardTotals: result.cardTotals.map((t) => ({ ...t, holder: c(t.holder) })),
+  };
+}
+
 export const COMMON_PERSON = 'Casa/Comum';
 
 export function personOf(t: { holder_name: string | null | undefined }): string {

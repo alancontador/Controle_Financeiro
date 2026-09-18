@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useDataChanged } from '@/lib/dataEvents';
 import { addMonths, monthKey, toIsoDate } from '@/lib/dates';
 import { summarizeByPerson, type PersonSummary, type PersonTx } from '@/lib/people';
 
@@ -21,19 +22,22 @@ export interface SpendingByPersonData {
  * Gastos por pessoa: resumo do mes (com comparacao ao anterior e top categorias)
  * e historico mensal dos ultimos `monthsBack` meses.
  */
-export function useSpendingByPerson(monthsBack = 6): SpendingByPersonData {
+/** @param wantedMonth mes pedido (aaaa-mm); sem ele, o atual (ou o ultimo com dados). */
+export function useSpendingByPerson(monthsBack = 6, wantedMonth?: string): SpendingByPersonData {
   const { user } = useAuth();
   const [summary, setSummary] = useState<PersonSummary[]>([]);
   const [history, setHistory] = useState<Record<string, { month: string; total: number }[]>>({});
   const [months, setMonths] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  // Primeira carga mostra o loading; as atualizacoes por evento sao silenciosas (sem piscar).
+  const hasLoaded = useRef(false);
   const [month, setMonth] = useState(monthKey(toIsoDate(new Date())));
 
-  const currentMonth = monthKey(toIsoDate(new Date()));
+  const currentMonth = wantedMonth ?? monthKey(toIsoDate(new Date()));
 
   const fetch = useCallback(async () => {
     if (!user) return;
-    setLoading(true);
+    if (!hasLoaded.current) setLoading(true);
     const from = addMonths(`${currentMonth}-01`, -(monthsBack - 1));
     const { data } = await supabase
       .from('transactions')
@@ -52,7 +56,7 @@ export function useSpendingByPerson(monthsBack = 6): SpendingByPersonData {
 
     // Mes corrente sem despesas (ex.: fatura do mes ainda nao importada): usa o ultimo com dados.
     const withData = [...new Set(txs.map((t) => t.date.slice(0, 7)))].sort();
-    const chosen = withData.includes(currentMonth) ? currentMonth : (withData.at(-1) ?? currentMonth);
+    const chosen = wantedMonth ?? (withData.includes(currentMonth) ? currentMonth : (withData.at(-1) ?? currentMonth));
     setMonth(chosen);
     setSummary(summarizeByPerson(txs, chosen, { previousMonth: monthKey(addMonths(`${chosen}-01`, -1)) }));
 
@@ -67,9 +71,11 @@ export function useSpendingByPerson(monthsBack = 6): SpendingByPersonData {
     setMonths(axis);
     setHistory(hist);
     setLoading(false);
+    hasLoaded.current = true;
   }, [user, currentMonth, monthsBack]);
 
   useEffect(() => { fetch(); }, [fetch]);
+  useDataChanged(fetch, ['transactions', 'cards', 'people']);
 
-  return { month, isFallback: month !== currentMonth, summary, history, months, loading, refetch: fetch };
+  return { month, isFallback: !wantedMonth && month !== currentMonth, summary, history, months, loading, refetch: fetch };
 }

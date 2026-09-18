@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { notifyDataChanged, useDataChanged } from '@/lib/dataEvents';
 import { format, subMonths, startOfMonth, endOfMonth, parseISO, isToday, isYesterday, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -44,16 +45,23 @@ export interface DashboardStats {
   balanceChange: number;
 }
 
-export function useDashboardStats() {
+/**
+ * @param refMonth mes de referencia dos cartoes e graficos (padrao: o atual).
+ *   As faturas importadas costumam ser do mes anterior, entao o dashboard
+ *   precisa navegar entre meses em vez de ficar preso ao corrente.
+ */
+export function useDashboardStats(refMonth: Date = new Date()) {
   const { user } = useAuth();
+  // Chave estavel para os memos (Date novo a cada render nao serve como dependencia).
+  const refKey = format(refMonth, 'yyyy-MM');
   const [loading, setLoading] = useState(true);
   const [allTransactions, setAllTransactions] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (silent = false) => {
     if (!user) return;
 
-    setLoading(true);
+    if (!silent) setLoading(true);
     try {
       // Fetch all transactions with categories
       const { data: transactionsData, error: transError } = await supabase
@@ -84,11 +92,13 @@ export function useDashboardStats() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+  // Qualquer mutacao em outra tela (ou a aba voltando ao foco) atualiza o dashboard sem piscar.
+  useDataChanged(() => fetchData(true));
 
   // Calculate monthly chart data (last 7 months)
   const monthlyChartData = useMemo((): MonthlyData[] => {
     const months: MonthlyData[] = [];
-    const now = new Date();
+    const now = parseISO(`${refKey}-01`);
 
     for (let i = 6; i >= 0; i--) {
       const monthDate = subMonths(now, i);
@@ -118,7 +128,7 @@ export function useDashboardStats() {
     }
 
     return months;
-  }, [allTransactions]);
+  }, [allTransactions, refKey]);
 
   // Calculate balance evolution data
   const balanceEvolution = useMemo(() => {
@@ -153,7 +163,7 @@ export function useDashboardStats() {
 
   // Current month stats
   const stats = useMemo((): DashboardStats => {
-    const now = new Date();
+    const now = parseISO(`${refKey}-01`);
     const currentMonthStart = startOfMonth(now);
     const currentMonthEnd = endOfMonth(now);
     const lastMonthStart = startOfMonth(subMonths(now, 1));
@@ -218,11 +228,11 @@ export function useDashboardStats() {
       expenseChange,
       balanceChange,
     };
-  }, [allTransactions]);
+  }, [allTransactions, refKey]);
 
   // Category breakdown for current month expenses
   const expensesByCategory = useMemo((): CategoryBreakdown[] => {
-    const now = new Date();
+    const now = parseISO(`${refKey}-01`);
     const monthStart = startOfMonth(now);
     const monthEnd = endOfMonth(now);
 
@@ -256,7 +266,7 @@ export function useDashboardStats() {
       }))
       .sort((a, b) => b.amount - a.amount)
       .slice(0, 5);
-  }, [allTransactions]);
+  }, [allTransactions, refKey]);
 
   // Recent transactions formatted for dashboard
   const recentTransactions = useMemo((): DashboardTransaction[] => {

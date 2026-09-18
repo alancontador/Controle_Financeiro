@@ -1,7 +1,9 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { FALLBACK_CATEGORY, normalizeDescription } from "@/lib/pdf/categorize";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { notifyDataChanged, useDataChanged } from "@/lib/dataEvents";
+
 import { useToast } from "@/hooks/use-toast";
 import { Category, defaultCategories } from "@/hooks/useCategories";
 
@@ -56,6 +58,8 @@ export function useTransactions() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+  // Primeira carga mostra o loading; as atualizacoes por evento sao silenciosas (sem piscar).
+  const hasLoaded = useRef(false);
   const [filters, setFilters] = useState<TransactionFilters>({
     type: "all",
     categoryId: null,
@@ -98,7 +102,7 @@ export function useTransactions() {
   const fetchTransactions = useCallback(async () => {
     if (!user) return;
 
-    setLoading(true);
+    if (!hasLoaded.current) setLoading(true);
     
     let query = supabase
       .from("transactions")
@@ -146,6 +150,7 @@ export function useTransactions() {
     }
 
     setLoading(false);
+    hasLoaded.current = true;
   }, [user, filters, toast]);
 
   const addTransaction = async (
@@ -172,6 +177,7 @@ export function useTransactions() {
     }
 
     setTransactions((prev) => [data as Transaction, ...prev]);
+    notifyDataChanged("transactions");
     {
       const saved = data as Transaction;
       if (saved.type === "expense" && saved.category?.name) void rememberCategory(user.id, saved.description, saved.category.name);
@@ -209,6 +215,7 @@ export function useTransactions() {
     setTransactions((prev) =>
       prev.map((t) => (t.id === id ? (data as Transaction) : t))
     );
+    notifyDataChanged("transactions");
     {
       // Trocar a pessoa de uma despesa vinda de fatura realoca a compra na fatura tambem.
       const saved = data as Transaction & { invoice_item_id?: string | null };
@@ -254,6 +261,7 @@ export function useTransactions() {
     }
 
     setTransactions((prev) => prev.filter((t) => t.id !== id));
+    notifyDataChanged("transactions");
     toast({
       title: "Transação excluída",
       description: "Sua transação foi removida com sucesso.",
@@ -286,6 +294,7 @@ export function useTransactions() {
     }
 
     setTransactions((prev) => [...(data as Transaction[]), ...prev]);
+    notifyDataChanged("transactions");
     toast({
       title: "Transações importadas",
       description: `${data.length} transações foram importadas com sucesso.`,
@@ -302,6 +311,8 @@ export function useTransactions() {
       fetchTransactions();
     }
   }, [categories, fetchTransactions]);
+  // Outras telas (fatura importada, recorrencia gerada, realocacao) mudam transacoes.
+  useDataChanged(fetchTransactions, ["transactions", "cards", "recurring", "people"]);
 
   return {
     transactions,

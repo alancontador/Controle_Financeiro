@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { notifyDataChanged, useDataChanged } from '@/lib/dataEvents';
 import { useToast } from '@/hooks/use-toast';
 import { computeCardUsage, type CardUsage } from '@/lib/cards/usage';
 import { itemToTransaction, MIRROR_NOTE } from '@/lib/cards/mirror';
@@ -96,13 +97,15 @@ export function useCreditCards() {
   const { toast } = useToast();
   const [cards, setCards] = useState<CreditCard[]>([]);
   const [loading, setLoading] = useState(true);
+  // Primeira carga mostra o loading; as atualizacoes por evento sao silenciosas (sem piscar).
+  const hasLoaded = useRef(false);
   const [openInvoiceTotals, setOpenInvoiceTotals] = useState<Record<string, number>>({});
   /** Uso do limite por cartao: faturas nao pagas + parcelas futuras (como o banco calcula). */
   const [usage, setUsage] = useState<Record<string, CardUsage>>({});
 
   const fetchCards = useCallback(async () => {
     if (!user) return;
-    setLoading(true);
+    if (!hasLoaded.current) setLoading(true);
     const { data, error } = await supabase
       .from('credit_cards')
       .select('*')
@@ -131,9 +134,11 @@ export function useCreditCards() {
       setOpenInvoiceTotals(totals);
     }
     setLoading(false);
+    hasLoaded.current = true;
   }, [user, toast]);
 
   useEffect(() => { fetchCards(); }, [fetchCards]);
+  useDataChanged(fetchCards, ['cards', 'transactions', 'people']);
 
   const createCard = async (data: {
     nickname: string;
@@ -174,6 +179,7 @@ export function useCreditCards() {
     });
 
     toast({ title: 'Cartão criado com sucesso!' });
+    notifyDataChanged('cards');
     fetchCards();
     return card as CreditCard;
   };
@@ -184,6 +190,7 @@ export function useCreditCards() {
       toast({ title: 'Erro ao atualizar cartão', description: error.message, variant: 'destructive' });
     } else {
       toast({ title: 'Cartão atualizado!' });
+      notifyDataChanged('cards');
       fetchCards();
     }
   };
@@ -194,6 +201,7 @@ export function useCreditCards() {
       toast({ title: 'Erro ao excluir cartão', description: error.message, variant: 'destructive' });
     } else {
       toast({ title: 'Cartão excluído!' });
+      notifyDataChanged('cards');
       fetchCards();
     }
   };
@@ -228,6 +236,7 @@ export function useInvoices(cardId: string) {
   }, [cardId]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
+  useDataChanged(fetchAll, ['cards', 'people']);
 
   const fetchItems = useCallback(async (invoiceId: string) => {
     const { data } = await supabase
@@ -384,6 +393,7 @@ export function useInvoices(cardId: string) {
       return false;
     }
     toast({ title: 'Fatura excluída' });
+    notifyDataChanged('cards');
     setItems([]);
     await fetchAll();
     return true;

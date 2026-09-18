@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { notifyDataChanged, useDataChanged } from '@/lib/dataEvents';
 import { useToast } from '@/hooks/use-toast';
 import { computeReceivables, type Charge, type Payment, type Receivable } from '@/lib/receivables';
 import { loadThirdPartySet } from '@/hooks/usePeople';
@@ -29,10 +30,12 @@ export function useReceivables() {
   const [charges, setCharges] = useState<ChargeRow[]>([]);
   const [payments, setPayments] = useState<PaymentRow[]>([]);
   const [loading, setLoading] = useState(true);
+  // Primeira carga mostra o loading; as atualizacoes por evento sao silenciosas (sem piscar).
+  const hasLoaded = useRef(false);
 
   const fetch = useCallback(async () => {
     if (!user) return;
-    setLoading(true);
+    if (!hasLoaded.current) setLoading(true);
     const third = await loadThirdPartySet(user.id);
     const names = [...third];
 
@@ -65,9 +68,11 @@ export function useReceivables() {
     setPayments(paymentRows);
     setReceivables(computeReceivables(chargeRows, paymentRows, names));
     setLoading(false);
+    hasLoaded.current = true;
   }, [user]);
 
   useEffect(() => { fetch(); }, [fetch]);
+  useDataChanged(fetch, ['cards', 'people']);
 
   const addPayment = async (person: string, amount: number, date: string, notes?: string) => {
     if (!user) return false;
@@ -77,6 +82,7 @@ export function useReceivables() {
       return false;
     }
     toast({ title: 'Pagamento registrado' });
+    notifyDataChanged('people');
     await fetch();
     return true;
   };

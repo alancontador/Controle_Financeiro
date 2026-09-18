@@ -13,7 +13,9 @@ import type { ParseResult } from '@/lib/pdf/types';
 import { CardModal, type CardFormData } from '@/components/cards/CardModal';
 import { ImportPdfModal, type ImportedInvoiceItem } from '@/components/cards/ImportPdfModal';
 import { useInvoiceImport, type Categorization } from '@/hooks/useInvoiceImport';
-import { usePeople } from '@/hooks/usePeople';
+import { usePeople, loadAliasMap } from '@/hooks/usePeople';
+import { applyPersonAliases } from '@/lib/people';
+import { useAuth } from '@/hooks/useAuth';
 import type { CardKind, InvoiceCard } from '@/lib/cards/kinds';
 import type { AttributionMemory } from '@/lib/cards/attribution';
 import type { CreditCard, Invoice } from '@/hooks/useCreditCards';
@@ -50,6 +52,7 @@ export function ImportInvoiceFlow({ cards, createCard, onImported }: Props) {
   const { toast } = useToast();
   const { findCardByLastFour, findExistingInvoice, importInvoice, loadCategorization, loadKnownKinds, loadAttribution } = useInvoiceImport();
   const { names: people, thirdParties } = usePeople();
+  const { user } = useAuth();
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [busy, setBusy] = useState(false);
@@ -85,7 +88,9 @@ export function ImportInvoiceFlow({ cards, createCard, onImported }: Props) {
     if (!file) return;
     setBusy(true);
     try {
-      const result = parseInvoice(await extractPdfLines(await file.arrayBuffer()));
+      // Nomes renomeados em Pessoas valem ja na leitura (a fatura traz o nome antigo).
+      const raw = parseInvoice(await extractPdfLines(await file.arrayBuffer()));
+      const result = user && !raw.error ? applyPersonAliases(raw, await loadAliasMap(user.id)) : raw;
       if (result.error) {
         toast({ title: 'Não foi possível ler a fatura', description: result.error, variant: 'destructive' });
         return;

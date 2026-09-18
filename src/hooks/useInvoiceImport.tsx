@@ -10,15 +10,23 @@ import {
 } from '@/lib/pdf/categorize';
 import type { ParsedHeader, ParsedItem } from '@/lib/pdf/types';
 import type { CardKind, InvoiceCard } from '@/lib/cards/kinds';
-import { attributionKeys, resolveAttribution, sharesFromFractions, type Attribution, type AttributionMemory } from '@/lib/cards/attribution';
+import { attributionKeys, fractionsFromShares, resolveAttribution, sharesFromFractions, type Attribution, type AttributionMemory } from '@/lib/cards/attribution';
+import type { Share } from '@/lib/cards/split';
 import { MIRROR_NOTE } from '@/lib/cards/mirror';
 import { loadThirdPartySet } from '@/hooks/usePeople';
+import { notifyDataChanged } from '@/lib/dataEvents';
 import type { CreditCard, Invoice } from '@/hooks/useCreditCards';
+import type { Json } from '@/integrations/supabase/types';
 
 export interface ImportableItem extends ParsedItem {
   is_previous_balance: boolean;
   /** Realocacao feita na revisao: responsavel diferente do titular do cartao. */
   assigned_to?: string | null;
+  /**
+   * Divisao feita na revisao. undefined = nao mexeu (vale a divisao lembrada, se
+   * houver); [] = tirou a divisao lembrada; 2+ partes = divide assim e lembra.
+   */
+  split_shares?: Share[];
 }
 
 /** O que a revisao precisa para categorizar: opcoes, sugestao e o mapa nome -> id. */
@@ -198,13 +206,22 @@ export function useInvoiceImport() {
       // Reaplica realocacoes e divisoes lembradas. O que o usuario escolheu na
       // revisao (assigned_to) vence a memoria e e gravado nela.
       const plannedSplits = new Map<number, ReturnType<typeof sharesFromFractions>>();
-      const memoryUpserts: { key: string; assigned_to: string | null }[] = [];
+      const memoryUpserts: { key: string; assigned_to: string | null; shares?: ReturnType<typeof fractionsFromShares> | null }[] = [];
       const rows = items.map((item, idx) => {
         let assigned = item.assigned_to ?? null;
         if (item.card_last_four) {
           const remembered = resolveAttribution(item, attribution);
-          if (assigned) {
-            const keys = attributionKeys(item);
+          const keys = attributionKeys(item);
+          if (item.split_shares && item.split_shares.length >= 2) {
+            // Divisao feita na revisao: grava e lembra (compra exata + descricao no cartao).
+            assigned = null;
+            plannedSplits.set(idx, item.split_shares);
+            const fractions = fractionsFromShares(item.amount, item.split_shares);
+            memoryUpserts.push({ key: keys.purchase, assigned_to: null, shares: fractions }, { key: keys.description, assigned_to: null, shares: fractions });
+          } else if (item.split_shares && item.split_shares.length === 0 && remembered?.shares) {
+            // Tirou a divisao lembrada: esquece.
+            memoryUpserts.push({ key: keys.purchase, assigned_to: assigned, shares: null }, { key: keys.description, assigned_to: assigned, shares: null });
+          } else if (assigned) {
             memoryUpserts.push({ key: keys.purchase, assigned_to: assigned }, { key: keys.description, assigned_to: assigned });
           } else if (remembered?.shares) {
             plannedSplits.set(idx, sharesFromFractions(item.amount, remembered.shares));
@@ -239,7 +256,7 @@ export function useInvoiceImport() {
       }
       if (memoryUpserts.length > 0) {
         await supabase.from('attribution_memory').upsert(
-          memoryUpserts.map((m) => ({ user_id: user.id, key: m.key, assigned_to: m.assigned_to, shares: null, updated_at: new Date().toISOString() })),
+          memoryUpserts.map((m) => ({ user_id: user.id, key: m.key, assigned_to: m.assigned_to, shares: (m.shares ?? null) as unknown as Json, updated_at: new Date().toISOString() })),
           { onConflict: 'user_id,key' },
         );
       }
@@ -344,6 +361,7 @@ export function useInvoiceImport() {
         .eq('id', invoiceId);
 
       toast({ title: existing ? 'Fatura substituída' : 'Fatura importada', description: `${input.items.length} lançamentos` });
+      notifyDataChanged('cards');
       return { status: 'ok', invoiceId };
     },
     [user, findExistingInvoice, ensureHolders, writeItems, toast],

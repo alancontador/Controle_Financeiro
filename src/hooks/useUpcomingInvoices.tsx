@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useDataChanged } from '@/lib/dataEvents';
 import { projectUpcomingInvoices, projectUpcomingInvoicesByPerson, type MonthProjection, type ProjectionItem } from '@/lib/cards/projection';
 import { addMonths, monthKey, toIsoDate } from '@/lib/dates';
 import { personShares, type Share } from '@/lib/cards/split';
@@ -30,10 +31,12 @@ export function useUpcomingInvoices(cardId?: string, months = 6): UpcomingInvoic
   const [committedNext3, setCommittedNext3] = useState(0);
   const [avgIncome3, setAvgIncome3] = useState(0);
   const [loading, setLoading] = useState(true);
+  // Primeira carga mostra o loading; as atualizacoes por evento sao silenciosas (sem piscar).
+  const hasLoaded = useRef(false);
 
   const fetch = useCallback(async () => {
     if (!user) return;
-    setLoading(true);
+    if (!hasLoaded.current) setLoading(true);
 
     let query = supabase
       .from('invoice_items')
@@ -73,9 +76,11 @@ export function useUpcomingInvoices(cardId?: string, months = 6): UpcomingInvoic
     const income = (incomeRes.data ?? []).reduce((s, t) => s + Number(t.amount), 0);
     setAvgIncome3(round2(income / 3));
     setLoading(false);
+    hasLoaded.current = true;
   }, [user, cardId, months]);
 
   useEffect(() => { fetch(); }, [fetch]);
+  useDataChanged(fetch, ['cards', 'people']);
 
   return { projection, byPerson, committedNext3, avgIncome3, loading, refetch: fetch };
 }

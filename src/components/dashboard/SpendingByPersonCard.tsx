@@ -12,8 +12,8 @@ const fmtMonth = (m: string) => MONTHS[Number(m.slice(5, 7)) - 1];
  * Card do Dashboard: despesas do mes por pessoa, com fatia, variacao contra o
  * mes anterior e as maiores categorias de cada uma - para achar o gargalo.
  */
-export function SpendingByPersonCard() {
-  const { month, isFallback, summary, loading } = useSpendingByPerson(2);
+export function SpendingByPersonCard({ month: wanted }: { month?: string } = {}) {
+  const { month, isFallback, summary, loading } = useSpendingByPerson(2, wanted);
   const grand = summary.reduce((s, p) => s + p.total, 0);
 
   return (

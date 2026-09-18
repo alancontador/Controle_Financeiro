@@ -1,6 +1,9 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Loader2, Wallet, TrendingUp, CreditCard, PiggyBank } from "lucide-react";
+import { MonthSwitcher } from "@/components/dashboard/MonthSwitcher";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { MobileNav } from "@/components/layout/MobileNav";
 import { Header } from "@/components/dashboard/Header";
@@ -19,6 +22,8 @@ import { useDashboardStats } from "@/hooks/useDashboardStats";
 const Index = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  // Mes em analise: os cartoes de cima, o grafico e as categorias seguem ele.
+  const [month, setMonth] = useState(() => new Date());
   const {
     loading,
     stats,
@@ -26,7 +31,7 @@ const Index = () => {
     balanceEvolution,
     expensesByCategory,
     recentTransactions,
-  } = useDashboardStats();
+  } = useDashboardStats(month);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -65,8 +70,10 @@ const Index = () => {
       <Sidebar />
       <MobileNav />
 
-      <main className="lg:ml-64 p-4 lg:p-8 pt-20 lg:pt-8">
+      <main className="lg:ml-[var(--sidebar-w,16rem)] transition-[margin] duration-200 p-4 lg:p-8 pt-20 lg:pt-8">
         <Header />
+
+        <MonthSwitcher month={month} onChange={setMonth} />
 
         {/* Stats Grid - Responsive */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6 mb-6">
@@ -79,7 +86,7 @@ const Index = () => {
             delay={0}
           />
           <StatCard
-            title="Receitas do Mês"
+            title={`Receitas de ${format(month, 'MMM', { locale: ptBR })}`}
             value={formatCurrency(stats.monthlyIncome)}
             change={stats.lastMonthIncome > 0 ? formatChange(stats.incomeChange) : undefined}
             changeType={stats.incomeChange >= 0 ? "positive" : "negative"}
@@ -87,7 +94,7 @@ const Index = () => {
             delay={0.05}
           />
           <StatCard
-            title="Despesas do Mês"
+            title={`Despesas de ${format(month, 'MMM', { locale: ptBR })}`}
             value={formatCurrency(stats.monthlyExpenses)}
             change={stats.lastMonthExpenses > 0 ? formatChange(stats.expenseChange) : undefined}
             changeType={stats.expenseChange <= 0 ? "positive" : "negative"}
@@ -95,7 +102,7 @@ const Index = () => {
             delay={0.1}
           />
           <StatCard
-            title="Saldo do Mês"
+            title={`Saldo de ${format(month, 'MMM', { locale: ptBR })}`}
             value={formatCurrency(stats.monthlyBalance)}
             changeType={stats.monthlyBalance >= 0 ? "positive" : "negative"}
             icon={PiggyBank}
@@ -103,9 +110,10 @@ const Index = () => {
           />
         </div>
 
+
         {/* Budget Alerts & Weekly Summary */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6 mb-6">
-          <SpendingByPersonCard />
+          <SpendingByPersonCard month={format(month, 'yyyy-MM')} />
           <DashboardBudgetAlerts />
         </div>
 

@@ -7,6 +7,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { HelpWidget } from "@/components/help/HelpWidget";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
+import ResetPassword from "./pages/ResetPassword";
 import Transactions from "./pages/Transactions";
 import Investments from "./pages/Investments";
 import Goals from "./pages/Goals";
@@ -33,6 +34,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/transactions" element={<Transactions />} />
             <Route path="/investments" element={<Investments />} />
             <Route path="/goals" element={<Goals />} />

@@ -309,7 +309,7 @@ export function TransactionModal({
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Data</FormLabel>
-                        <Popover>
+                        <Popover modal>
                           <PopoverTrigger asChild>
                             <FormControl>
                               <Button

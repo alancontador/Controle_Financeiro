@@ -95,7 +95,7 @@ export default function Budgets() {
       <Sidebar />
       <MobileNav />
 
-      <main className="lg:ml-64 min-h-screen">
+      <main className="lg:ml-[var(--sidebar-w,16rem)] transition-[margin] duration-200 min-h-screen">
         <div className="p-4 lg:p-8 pt-20 lg:pt-8">
           {/* Header */}
           <motion.div

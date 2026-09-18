@@ -57,7 +57,7 @@ const Cards = () => {
     <div className="min-h-screen bg-background">
       <Sidebar />
       <MobileNav />
-      <main className="lg:ml-64 p-4 lg:p-8 pt-20 lg:pt-8">
+      <main className="lg:ml-[var(--sidebar-w,16rem)] transition-[margin] duration-200 p-4 lg:p-8 pt-20 lg:pt-8">
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div>

@@ -3,6 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Category } from "@/hooks/useTransactions";
+import { notifyDataChanged, useDataChanged } from "@/lib/dataEvents";
+import { processRecurringNow } from "@/lib/recurringRun";
 
 export interface RecurringTransaction {
   id: string;
@@ -17,6 +19,11 @@ export interface RecurringTransaction {
   notes: string | null;
   is_active: boolean;
   next_execution_date: string;
+  /** Prazo final (inclusive); null = sem fim. */
+  end_date: string | null;
+  /** Numero de parcelas; null = sem fim. */
+  installments_total: number | null;
+  installments_done: number;
   last_executed_at: string | null;
   created_at: string;
   updated_at: string;
@@ -55,7 +62,7 @@ export function useRecurringTransactions() {
   }, [user, toast]);
 
   const addRecurringTransaction = async (
-    transaction: Omit<RecurringTransaction, "id" | "user_id" | "created_at" | "updated_at" | "last_executed_at" | "category">
+    transaction: Omit<RecurringTransaction, "id" | "user_id" | "created_at" | "updated_at" | "last_executed_at" | "category" | "installments_done">
   ) => {
     if (!user) return null;
 
@@ -82,6 +89,13 @@ export function useRecurringTransactions() {
       title: "Transação recorrente criada",
       description: "Sua transação recorrente foi configurada com sucesso.",
     });
+    notifyDataChanged("recurring");
+    // Se a primeira ocorrencia ja venceu (ou e hoje), gera agora - sem esperar o cron da madrugada.
+    const created = await processRecurringNow(true);
+    if (created > 0) {
+      toast({ title: `${created} lançamento(s) gerado(s)`, description: "As ocorrências já vencidas foram criadas nas transações." });
+      await fetchRecurringTransactions();
+    }
     return data as RecurringTransaction;
   };
 
@@ -115,6 +129,9 @@ export function useRecurringTransactions() {
       title: "Transação recorrente atualizada",
       description: "Sua transação recorrente foi atualizada com sucesso.",
     });
+    notifyDataChanged("recurring");
+    const created = await processRecurringNow(true);
+    if (created > 0) await fetchRecurringTransactions();
     return data as RecurringTransaction;
   };
 
@@ -137,6 +154,7 @@ export function useRecurringTransactions() {
     }
 
     setRecurringTransactions((prev) => prev.filter((t) => t.id !== id));
+    notifyDataChanged("recurring");
     toast({
       title: "Transação recorrente excluída",
       description: "Sua transação recorrente foi removida com sucesso.",
@@ -153,6 +171,7 @@ export function useRecurringTransactions() {
       fetchRecurringTransactions();
     }
   }, [user, fetchRecurringTransactions]);
+  useDataChanged(fetchRecurringTransactions, ["recurring", "categories"]);
 
   return {
     recurringTransactions,

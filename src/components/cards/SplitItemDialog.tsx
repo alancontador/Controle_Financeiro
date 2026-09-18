@@ -7,6 +7,9 @@ import { Scissors, Equal, Trash2 } from 'lucide-react';
 import { splitEqually, validateSplit, type Share } from '@/lib/cards/split';
 import type { InvoiceItem } from '@/hooks/useCreditCards';
 
+/** O que a divisao precisa saber da compra; um item da revisao (sem id) tambem serve. */
+export type SplittableItem = Pick<InvoiceItem, 'description' | 'amount' | 'holder_name'>;
+
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const toNumber = (s: string) => {
   const n = parseFloat(s.replace(/\./g, '').replace(',', '.'));
@@ -15,7 +18,7 @@ const toNumber = (s: string) => {
 const toInput = (n: number) => n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 interface Props {
-  item: InvoiceItem | null;
+  item: SplittableItem | null;
   current: Share[];
   people: string[];
   thirdParties?: ReadonlySet<string>;

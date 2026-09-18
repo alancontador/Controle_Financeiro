@@ -159,7 +159,7 @@ const CardInvoices = () => {
     <div className="min-h-screen bg-background">
       <Sidebar />
       <MobileNav />
-      <main className="lg:ml-64 p-4 lg:p-8 pt-20 lg:pt-8">
+      <main className="lg:ml-[var(--sidebar-w,16rem)] transition-[margin] duration-200 p-4 lg:p-8 pt-20 lg:pt-8">
         {/* Header */}
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
           <Button variant="ghost" size="sm" onClick={() => navigate('/cartoes')} className="mb-2">
@@ -297,20 +297,27 @@ const CardInvoices = () => {
                                   <Table>
                                     <TableHeader>
                                       <TableRow>
-                                        <TableHead>Data</TableHead>
+                                        <TableHead className="w-[72px]">Data</TableHead>
                                         <TableHead>Descrição</TableHead>
-                                        <TableHead>Categoria</TableHead>
+                                        <TableHead className="hidden md:table-cell">Categoria</TableHead>
                                         <TableHead>Responsável</TableHead>
-                                        <TableHead>Parcela</TableHead>
+                                        <TableHead className="hidden xl:table-cell">Parcela</TableHead>
                                         <TableHead className="text-right">Valor</TableHead>
                                       </TableRow>
                                     </TableHeader>
                                     <TableBody>
                                       {cardGroup.items.map(item => (
                                         <TableRow key={item.id}>
-                                          <TableCell className="whitespace-nowrap">{fmtDateShort(item.transaction_date)}</TableCell>
-                                          <TableCell>{item.description}</TableCell>
-                                          <TableCell className="text-muted-foreground">{item.category}</TableCell>
+                                          <TableCell className="whitespace-nowrap text-muted-foreground">{fmtDateShort(item.transaction_date)}</TableCell>
+                                          <TableCell className="min-w-[140px]">
+                                            <span className="block">{item.description}</span>
+                                            {/* Em telas menores, categoria e parcela ficam aqui em vez de colunas proprias */}
+                                            <span className="text-xs text-muted-foreground md:hidden">{item.category}</span>
+                                            {item.installment_current && item.installment_total && (
+                                              <span className="ml-1 text-[11px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground xl:hidden">{item.installment_current}/{item.installment_total}</span>
+                                            )}
+                                          </TableCell>
+                                          <TableCell className="text-muted-foreground hidden md:table-cell">{item.category}</TableCell>
                                           <TableCell>
                                             {item.holder_name === 'Pagamentos' || isPaymentLine(item.description) ? (
                                               <span className="text-muted-foreground">-</span>
@@ -331,7 +338,7 @@ const CardInvoices = () => {
                                                 value={item.assigned_to || item.holder_name}
                                                 onValueChange={(v) => reassignItem(item, v === item.holder_name ? null : v)}
                                               >
-                                                <SelectTrigger className={`h-8 text-xs w-[190px] inline-flex ${item.assigned_to ? 'border-primary/60 text-primary' : ''}`} title={item.assigned_to ? `Compra no cartão de ${item.holder_name}, realocada` : 'Quem é responsável por esta despesa'}>
+                                                <SelectTrigger className={`h-8 text-xs w-[150px] lg:w-[180px] inline-flex ${item.assigned_to ? 'border-primary/60 text-primary' : ''}`} title={item.assigned_to ? `Compra no cartão de ${item.holder_name}, realocada` : 'Quem é responsável por esta despesa'}>
                                                   <SelectValue />
                                                 </SelectTrigger>
                                                 <SelectContent>
@@ -353,7 +360,7 @@ const CardInvoices = () => {
                                               </button>
                                             )}
                                           </TableCell>
-                                          <TableCell>
+                                          <TableCell className="hidden xl:table-cell">
                                             {item.installment_current && item.installment_total
                                               ? `${item.installment_current}/${item.installment_total}`
                                               : '-'}

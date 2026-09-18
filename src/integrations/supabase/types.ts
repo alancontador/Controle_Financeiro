@@ -541,6 +541,7 @@ export type Database = {
           name: string
           kind: string
           notes: string | null
+          aliases: string[]
           created_at: string
         }
         Insert: {
@@ -549,6 +550,7 @@ export type Database = {
           name: string
           kind?: string
           notes?: string | null
+          aliases?: string[]
           created_at?: string
         }
         Update: {
@@ -557,6 +559,7 @@ export type Database = {
           name?: string
           kind?: string
           notes?: string | null
+          aliases?: string[]
           created_at?: string
         }
         Relationships: []
@@ -662,8 +665,11 @@ export type Database = {
           day_of_month: number | null
           day_of_week: number | null
           description: string
+          end_date: string | null
           frequency: string
           id: string
+          installments_done: number
+          installments_total: number | null
           is_active: boolean
           last_executed_at: string | null
           next_execution_date: string
@@ -679,8 +685,11 @@ export type Database = {
           day_of_month?: number | null
           day_of_week?: number | null
           description: string
+          end_date?: string | null
           frequency: string
           id?: string
+          installments_done?: number
+          installments_total?: number | null
           is_active?: boolean
           last_executed_at?: string | null
           next_execution_date: string
@@ -696,8 +705,11 @@ export type Database = {
           day_of_month?: number | null
           day_of_week?: number | null
           description?: string
+          end_date?: string | null
           frequency?: string
           id?: string
+          installments_done?: number
+          installments_total?: number | null
           is_active?: boolean
           last_executed_at?: string | null
           next_execution_date?: string
@@ -725,6 +737,7 @@ export type Database = {
           description: string
           id: string
           notes: string | null
+          recurring_id: string | null
           type: string
           updated_at: string
           user_id: string
@@ -740,6 +753,7 @@ export type Database = {
           description: string
           id?: string
           notes?: string | null
+          recurring_id?: string | null
           type: string
           updated_at?: string
           user_id: string
@@ -755,6 +769,7 @@ export type Database = {
           description?: string
           id?: string
           notes?: string | null
+          recurring_id?: string | null
           type?: string
           updated_at?: string
           user_id?: string
@@ -777,7 +792,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      rename_person: {
+        Args: { p_old: string; p_new: string }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Loader2, Users, UserPlus, Trash2, HandCoins, Home, ChevronDown, ChevronUp } from 'lucide-react';
+import { Loader2, Users, UserPlus, Trash2, HandCoins, Home, ChevronDown, ChevronUp, Pencil } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { MobileNav } from '@/components/layout/MobileNav';
 import { Button } from '@/components/ui/button';
@@ -15,7 +17,7 @@ import {
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useAuth } from '@/hooks/useAuth';
-import { usePeople, type Person } from '@/hooks/usePeople';
+import { usePeople, type Person, type PersonKind } from '@/hooks/usePeople';
 import { useReceivables } from '@/hooks/useReceivables';
 import { toIsoDate } from '@/lib/dates';
 
@@ -29,7 +31,7 @@ const toNumber = (s: string) => {
 const People = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
-  const { people, loading, addThirdParty, removeThirdParty, refetch } = usePeople();
+  const { people, loading, addThirdParty, removeThirdParty, updatePerson, refetch } = usePeople();
   const { receivables, charges, payments, loading: loadingRecv, addPayment, deletePayment, refetch: refetchRecv } = useReceivables();
 
   const [newName, setNewName] = useState('');
@@ -40,6 +42,20 @@ const People = () => {
   const [payDate, setPayDate] = useState(toIsoDate(new Date()));
   const [payNotes, setPayNotes] = useState('');
   const [removing, setRemoving] = useState<Person | null>(null);
+  const [editing, setEditing] = useState<Person | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editKind, setEditKind] = useState<PersonKind>('household');
+  const [editNotes, setEditNotes] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
+  const openEdit = (p: Person) => { setEditing(p); setEditName(p.name); setEditKind(p.kind); setEditNotes(p.notes ?? ''); };
+  const submitEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editing) return;
+    setSavingEdit(true);
+    const ok = await updatePerson(editing, { name: editName, kind: editKind, notes: editNotes });
+    setSavingEdit(false);
+    if (ok) { setEditing(null); refetchRecv(); }
+  };
 
   useEffect(() => {
     if (!authLoading && !user) navigate('/auth');
@@ -82,7 +98,7 @@ const People = () => {
     <div className="min-h-screen bg-background">
       <Sidebar />
       <MobileNav />
-      <main className="lg:ml-64 p-4 lg:p-8 pt-20 lg:pt-8">
+      <main className="lg:ml-[var(--sidebar-w,16rem)] transition-[margin] duration-200 p-4 lg:p-8 pt-20 lg:pt-8">
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
           <h1 className="text-2xl lg:text-3xl font-bold text-foreground tracking-tight flex items-center gap-2">
             <Users className="w-7 h-7 text-primary" /> Pessoas
@@ -106,9 +122,18 @@ const People = () => {
                 {household.length === 0 ? (
                   <p className="text-sm text-muted-foreground">Importe uma fatura para as pessoas da casa aparecerem.</p>
                 ) : (
-                  <ul className="space-y-2">
+                  <ul className="space-y-1">
                     {household.map((p) => (
-                      <li key={p.name} className="text-sm font-medium">{p.name}</li>
+                      <li key={p.name} className="text-sm font-medium flex items-center justify-between gap-2 rounded-md px-2 py-1.5 hover:bg-muted/60">
+                        <span className="min-w-0">
+                          <span className="block truncate">{p.name}</span>
+                          {p.aliases && p.aliases.length > 0 && <span className="block text-[11px] text-muted-foreground font-normal truncate">na fatura: {p.aliases.join(', ')}</span>}
+                          {p.notes && <span className="block text-xs text-muted-foreground font-normal truncate">{p.notes}</span>}
+                        </span>
+                        <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0" onClick={() => openEdit(p)} aria-label={`Editar ${p.name}`} title="Editar">
+                          <Pencil className="w-3.5 h-3.5" />
+                        </Button>
+                      </li>
                     ))}
                   </ul>
                 )}
@@ -174,6 +199,9 @@ const People = () => {
                               <div className="flex gap-1">
                                 <Button size="sm" variant="outline" onClick={() => { setPaying(p.name); setPayAmount(r && r.balance > 0 ? r.balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : ''); }}>
                                   <HandCoins className="w-3.5 h-3.5 mr-1" /> Pagamento
+                                </Button>
+                                <Button size="sm" variant="ghost" onClick={() => openEdit(p)} aria-label={`Editar ${p.name}`} title="Editar pessoa">
+                                  <Pencil className="w-3.5 h-3.5" />
                                 </Button>
                                 <Button size="sm" variant="ghost" onClick={() => setRemoving(p)} aria-label={`Remover ${p.name}`} title="Remover pessoa">
                                   <Trash2 className="w-3.5 h-3.5 text-destructive" />
@@ -271,7 +299,50 @@ const People = () => {
         </Dialog>
 
         {/* Remover terceiro */}
-        <AlertDialog open={!!removing} onOpenChange={(o) => { if (!o) setRemoving(null); }}>
+        <Dialog open={!!editing} onOpenChange={(o) => { if (!o) setEditing(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <form onSubmit={submitEdit}>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2"><Pencil className="w-4 h-4" /> Editar pessoa</DialogTitle>
+              <DialogDescription>
+                Renomear atualiza faturas, transações e pagamentos já lançados. O nome antigo fica guardado para as próximas faturas importadas caírem nesta pessoa.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3 py-3">
+              <div>
+                <Label htmlFor="edit-name" className="text-xs">Nome</Label>
+                <Input id="edit-name" value={editName} onChange={(e) => setEditName(e.target.value)} required autoFocus />
+              </div>
+              <div>
+                <Label className="text-xs">Tipo</Label>
+                <Select value={editKind} onValueChange={(v) => setEditKind(v as PersonKind)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="household">Casa — gastos contam nas minhas análises</SelectItem>
+                    <SelectItem value="third_party">Terceiro — me paga depois (não é despesa minha)</SelectItem>
+                  </SelectContent>
+                </Select>
+                {editing && editKind !== editing.kind && (
+                  <p className="text-xs text-amber-600 mt-1">Mudar o tipo refaz as despesas das compras desta pessoa nas transações.</p>
+                )}
+              </div>
+              <div>
+                <Label htmlFor="edit-notes" className="text-xs">Observação</Label>
+                <Textarea id="edit-notes" value={editNotes} onChange={(e) => setEditNotes(e.target.value)} rows={2} placeholder="Como te paga, parentesco, etc." />
+              </div>
+              {editing?.aliases && editing.aliases.length > 0 && (
+                <p className="text-xs text-muted-foreground">Também reconhecido como: {editing.aliases.join(', ')}</p>
+              )}
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setEditing(null)} disabled={savingEdit}>Cancelar</Button>
+              <Button type="submit" disabled={savingEdit || !editName.trim()}>{savingEdit ? 'Salvando...' : 'Salvar'}</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={!!removing} onOpenChange={(o) => { if (!o) setRemoving(null); }}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Remover {removing?.name}?</AlertDialogTitle>
