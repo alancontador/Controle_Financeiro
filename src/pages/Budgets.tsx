@@ -13,11 +13,14 @@ import { BudgetModal } from "@/components/budgets/BudgetModal";
 import { BudgetAlerts } from "@/components/budgets/BudgetAlerts";
 import { DeleteConfirmModal } from "@/components/transactions/DeleteConfirmModal";
 import { PersonSelect } from "@/components/people/PersonSelect";
+import { MonthSwitcher } from "@/components/dashboard/MonthSwitcher";
 import { Link } from "react-router-dom";
 
 export default function Budgets() {
   const { user, loading: authLoading } = useAuth();
   const [personFilter, setPersonFilter] = useState<string | null>(null);
+  // Mes analisado: o gasto de cada orcamento e deste mes.
+  const [month, setMonth] = useState(() => new Date());
   const {
     budgets,
     categoriesWithoutBudget,
@@ -28,7 +31,7 @@ export default function Budgets() {
     deleteBudget,
     globalBudget,
     monthTotal,
-  } = useBudgets(new Date(), personFilter);
+  } = useBudgets(month, personFilter);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingBudget, setEditingBudget] = useState<BudgetWithSpending | null>(null);
@@ -133,6 +136,8 @@ export default function Budgets() {
             </Button>
             </div>
           </motion.div>
+
+          <MonthSwitcher month={month} onChange={setMonth} />
 
           {/* Teto mensal da casa (Configuracoes) x gasto do mes */}
           {globalBudget > 0 && !personFilter && (

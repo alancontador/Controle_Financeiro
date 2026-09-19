@@ -43,7 +43,11 @@ export function exportInvoice(
   format: "xlsx" | "csv",
 ) {
   const rows = invoiceRows(card, invoice, items, splits);
-  const sheet = XLSX.utils.json_to_sheet(rows);
+  // No CSV os numeros vao como texto pt-BR ("32,90"): Excel em portugues le como numero; no xlsx ficam numericos.
+  const data = format === "csv"
+    ? rows.map((r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, typeof v === "number" ? v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : v])))
+    : rows;
+  const sheet = XLSX.utils.json_to_sheet(data);
   sheet["!cols"] = [14, 12, 10, 36, 20, 10, 24, 8, 12, 24, 12, 14, 8].map((w) => ({ wch: w }));
   const book = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(book, sheet, "Fatura");
