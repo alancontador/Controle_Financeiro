@@ -12,9 +12,12 @@ import { BudgetCard } from "@/components/budgets/BudgetCard";
 import { BudgetModal } from "@/components/budgets/BudgetModal";
 import { BudgetAlerts } from "@/components/budgets/BudgetAlerts";
 import { DeleteConfirmModal } from "@/components/transactions/DeleteConfirmModal";
+import { PersonSelect } from "@/components/people/PersonSelect";
+import { Link } from "react-router-dom";
 
 export default function Budgets() {
   const { user, loading: authLoading } = useAuth();
+  const [personFilter, setPersonFilter] = useState<string | null>(null);
   const {
     budgets,
     categoriesWithoutBudget,
@@ -23,7 +26,9 @@ export default function Budgets() {
     addBudget,
     updateBudget,
     deleteBudget,
-  } = useBudgets();
+    globalBudget,
+    monthTotal,
+  } = useBudgets(new Date(), personFilter);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingBudget, setEditingBudget] = useState<BudgetWithSpending | null>(null);
@@ -42,13 +47,13 @@ export default function Budgets() {
     return <Navigate to="/auth" replace />;
   }
 
-  const handleSubmit = async (categoryId: string, amount: number) => {
+  const handleSubmit = async (categoryId: string, amount: number, person: string | null) => {
     setIsSubmitting(true);
     try {
       if (editingBudget) {
-        await updateBudget(editingBudget.id, amount);
+        await updateBudget(editingBudget.id, amount, person);
       } else {
-        await addBudget(categoryId, amount);
+        await addBudget(categoryId, amount, person);
       }
       setIsModalOpen(false);
       setEditingBudget(null);
@@ -117,15 +122,34 @@ export default function Budgets() {
               </div>
             </div>
 
+            <div className="flex flex-wrap items-center gap-3">
+            <PersonSelect value={personFilter} onChange={setPersonFilter} className="w-full sm:w-60 bg-card" />
             <Button
               onClick={() => setIsModalOpen(true)}
-              disabled={categoriesWithoutBudget.length === 0}
               className="glow-primary"
             >
               <Plus className="w-4 h-4 mr-2" />
               Novo Orçamento
             </Button>
+            </div>
           </motion.div>
+
+          {/* Teto mensal da casa (Configuracoes) x gasto do mes */}
+          {globalBudget > 0 && !personFilter && (
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="glass-card rounded-xl p-5 mb-6">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                <div>
+                  <p className="text-sm font-semibold text-foreground">Orçamento mensal da casa</p>
+                  <p className="text-xs text-muted-foreground">Teto definido em <Link to="/settings" className="text-primary hover:underline">Configurações</Link> · gasto do mês (todas as categorias) {formatCurrency(monthTotal)} de {formatCurrency(globalBudget)}</p>
+                </div>
+                <span className={`text-sm font-bold ${monthTotal > globalBudget ? 'text-destructive' : 'text-foreground'}`}>{Math.round((monthTotal / globalBudget) * 100)}%</span>
+              </div>
+              <div className="h-2 rounded-full bg-muted overflow-hidden">
+                <div className={`h-full ${monthTotal > globalBudget ? 'bg-destructive' : monthTotal / globalBudget > 0.8 ? 'bg-yellow-500' : 'bg-primary'}`} style={{ width: `${Math.min(100, (monthTotal / globalBudget) * 100)}%` }} />
+              </div>
+              {totalBudget > globalBudget && <p className="text-xs text-amber-600 mt-2">A soma dos limites por categoria ({formatCurrency(totalBudget)}) passa do teto mensal da casa.</p>}
+            </motion.div>
+          )}
 
           {/* Alerts */}
           <BudgetAlerts overBudgetCategories={overBudgetCategories} />

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Loader2, Plus, ArrowLeft, Upload, FileSpreadsheet, Trash2, Scissors } from 'lucide-react';
+import { Loader2, Plus, ArrowLeft, Upload, FileSpreadsheet, Trash2, Scissors, Download } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { MobileNav } from '@/components/layout/MobileNav';
@@ -20,6 +20,8 @@ import type { AttributionMemory } from '@/lib/cards/attribution';
 import { UpcomingInvoices } from '@/components/cards/UpcomingInvoices';
 import { CARD_KIND_LABEL, type CardKind, type InvoiceCard } from '@/lib/cards/kinds';
 import { AddItemModal } from '@/components/cards/AddItemModal';
+import { exportInvoice } from '@/utils/exportInvoice';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { ImportExcelModal } from '@/components/cards/ImportExcelModal';
 import { ImportPdfModal } from '@/components/cards/ImportPdfModal';
 import {
@@ -256,6 +258,19 @@ const CardInvoices = () => {
                             <Upload className="w-4 h-4 mr-1" /> Importar PDF da fatura
                           </Button>
                         </>
+                      )}
+                      {items.length > 0 && card && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button size="sm" variant="outline" title="Exportar os lançamentos desta fatura">
+                              <Download className="w-4 h-4 mr-1" /> Exportar
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => exportInvoice(card, selectedInvoice, items, splits, 'xlsx')}>Excel (.xlsx)</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => exportInvoice(card, selectedInvoice, items, splits, 'csv')}>CSV (;)</DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       )}
                       <Button size="sm" variant="outline" onClick={() => setConfirmDeleteOpen(true)} title="Excluir fatura">
                         <Trash2 className="w-4 h-4 mr-1 text-destructive" /> Excluir fatura

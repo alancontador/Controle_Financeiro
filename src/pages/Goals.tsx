@@ -12,10 +12,13 @@ import { GoalModal } from "@/components/goals/GoalModal";
 import { ContributionModal } from "@/components/goals/ContributionModal";
 import { DeleteConfirmModal } from "@/components/transactions/DeleteConfirmModal";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PersonSelect } from "@/components/people/PersonSelect";
 
 const Goals = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  // Filtro por pessoa: metas de cada um ou da casa toda.
+  const [personFilter, setPersonFilter] = useState<string | null>(null);
   const {
     goals,
     loading,
@@ -25,7 +28,7 @@ const Goals = () => {
     addContribution,
     stats,
     goalCategories,
-  } = useGoals();
+  } = useGoals(personFilter);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
@@ -205,6 +208,10 @@ const Goals = () => {
         </div>
 
         {/* Goals Tabs */}
+        <div className="flex flex-wrap items-center gap-3 mb-4">
+          <PersonSelect value={personFilter} onChange={setPersonFilter} className="w-full sm:w-64" />
+        </div>
+
         <Tabs defaultValue="active" className="w-full">
           <TabsList className="grid w-full max-w-md grid-cols-2 mb-6">
             <TabsTrigger value="active" className="gap-2">

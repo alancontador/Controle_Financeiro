@@ -121,3 +121,10 @@ export function summarizeByPerson(
     }))
     .sort((a, b) => b.total - a.total);
 }
+
+/** Mesma regra para filtrar em memoria. */
+export function matchesPerson(tx: { holder_name?: string | null }, person: string | null | undefined): boolean {
+  if (!person) return true;
+  if (person === COMMON_PERSON) return !tx.holder_name;
+  return tx.holder_name === person;
+}

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Loader2, TrendingUp, Wallet, Target, PiggyBank } from "lucide-react";
@@ -15,10 +15,13 @@ import { RetirementSimulator } from "@/components/investments/RetirementSimulato
 import { ProjectionChart } from "@/components/investments/ProjectionChart";
 import { AssetComparison } from "@/components/investments/AssetComparison";
 import { InvestmentsList } from "@/components/investments/InvestmentsList";
+import { PersonSelect } from "@/components/people/PersonSelect";
 
 const Investments = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  // Carteira de cada pessoa ou da casa toda.
+  const [personFilter, setPersonFilter] = useState<string | null>(null);
   const {
     investmentClasses,
     allocationByClass,
@@ -50,7 +53,7 @@ const Investments = () => {
     updateDividend,
     deleteDividend,
     isLoading,
-  } = useInvestments();
+  } = useInvestments(personFilter);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -82,14 +85,17 @@ const Investments = () => {
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-6"
+          className="mb-6 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3"
         >
-          <h1 className="text-2xl lg:text-3xl font-bold text-foreground tracking-tight">
-            Investimentos
-          </h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Gerencie seu portfólio e planeje sua aposentadoria
-          </p>
+          <div>
+            <h1 className="text-2xl lg:text-3xl font-bold text-foreground tracking-tight">
+              Investimentos
+            </h1>
+            <p className="text-muted-foreground text-sm mt-1">
+              Gerencie seu portfólio e planeje sua aposentadoria{personFilter ? ` · carteira de ${personFilter}` : ''}
+            </p>
+          </div>
+          <PersonSelect value={personFilter} onChange={setPersonFilter} className="w-full sm:w-60 bg-card" />
         </motion.div>
 
         {/* Quick Stats */}
@@ -107,7 +113,7 @@ const Investments = () => {
               <div>
                 <p className="text-xs text-muted-foreground">Patrimônio</p>
                 <p className="text-lg font-bold text-foreground">
-                  R$ {totalValue > 0 ? (totalValue / 1000).toFixed(0) + 'k' : '0'}
+                  {totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}
                 </p>
               </div>
             </div>

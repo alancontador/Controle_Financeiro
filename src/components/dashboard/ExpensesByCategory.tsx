@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import {
@@ -49,7 +50,11 @@ const CustomTooltip = ({ active, payload }: any) => {
   return null;
 };
 
+const fmtBRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
 export function ExpensesByCategory({ data, subtitle }: ExpensesByCategoryProps) {
+  // Fatia em destaque: passar o mouse na legenda ou na rosca destaca a mesma categoria.
+  const [active, setActive] = useState<number | null>(null);
   const chartData = data.map((item) => ({
     name: item.name,
     value: item.amount,
@@ -97,21 +102,36 @@ export function ExpensesByCategory({ data, subtitle }: ExpensesByCategoryProps) 
                     paddingAngle={3}
                     dataKey="value"
                     stroke="none"
+                    onMouseEnter={(_, index) => setActive(index)}
+                    onMouseLeave={() => setActive(null)}
                   >
                     {chartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={entry.color}
+                        opacity={active === null || active === index ? 1 : 0.35}
+                        style={{ transition: "opacity 150ms" }}
+                      />
                     ))}
                   </Pie>
                   <Tooltip content={<CustomTooltip />} />
                 </PieChart>
               </ResponsiveContainer>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="text-center">
-                  <p className="text-foreground font-bold text-sm">
-                    {totalExpenses >= 1000
-                      ? `R$ ${(totalExpenses / 1000).toFixed(0)}k`
-                      : `R$ ${totalExpenses.toFixed(0)}`}
-                  </p>
+              {/* pointer-events-none: sem isso o rotulo do meio cobria a rosca e o tooltip nunca aparecia */}
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="text-center px-2">
+                  {active !== null && chartData[active] ? (
+                    <>
+                      <p className="text-foreground font-bold text-xs leading-tight">{fmtBRL(chartData[active].value)}</p>
+                      <p className="text-muted-foreground text-[10px] leading-tight">{chartData[active].percentage.toFixed(0)}%</p>
+                    </>
+                  ) : (
+                    <p className="text-foreground font-bold text-sm">
+                      {totalExpenses >= 1000
+                        ? `R$ ${(totalExpenses / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} mil`
+                        : fmtBRL(totalExpenses)}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -125,19 +145,22 @@ export function ExpensesByCategory({ data, subtitle }: ExpensesByCategoryProps) 
                     initial={{ opacity: 0, x: 10 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.35 + index * 0.05 }}
-                    className="flex items-center justify-between"
+                    className={`flex items-center justify-between gap-2 rounded-md px-1.5 py-1 -mx-1.5 cursor-default transition-colors ${active === index ? "bg-muted/60" : ""}`}
+                    onMouseEnter={() => setActive(index)}
+                    onMouseLeave={() => setActive(null)}
+                    title={`${item.name}: ${fmtBRL(item.amount)} (${item.percentage.toFixed(1)}%)`}
                   >
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
                       <div
-                        className="w-2 h-2 rounded-full"
+                        className="w-2 h-2 rounded-full shrink-0"
                         style={{ backgroundColor: item.color }}
                       />
-                      <span className="text-muted-foreground text-sm truncate max-w-[100px]">
+                      <span className="text-muted-foreground text-sm truncate">
                         {item.name}
                       </span>
                     </div>
-                    <span className="text-foreground text-sm font-medium">
-                      {item.percentage.toFixed(0)}%
+                    <span className="text-foreground text-sm font-medium whitespace-nowrap">
+                      {fmtBRL(item.amount)} <span className="text-muted-foreground text-xs">{item.percentage.toFixed(0)}%</span>
                     </span>
                   </motion.div>
                 );

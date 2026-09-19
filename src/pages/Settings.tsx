@@ -17,6 +17,7 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { MobileNav } from "@/components/layout/MobileNav";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -349,19 +350,15 @@ const Settings = () => {
                   <DollarSign className="w-4 h-4" />
                   Orçamento Mensal (R$)
                 </Label>
-                <Input
+                <CurrencyInput
                   id="monthly_budget"
-                  type="number"
                   value={formData.monthly_budget}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      monthly_budget: Number(e.target.value),
-                    })
-                  }
-                  placeholder="0,00"
+                  onChange={(n) => setFormData({ ...formData, monthly_budget: n })}
                   className="bg-secondary/50"
                 />
+                <p className="text-xs text-muted-foreground">
+                  Teto de gastos do mês para a casa toda. Aparece no dashboard (Orçamentos), na página de Orçamentos e na previsão do Calendário; os limites por categoria ficam em Orçamentos.
+                </p>
               </div>
 
               {/* Notifications */}

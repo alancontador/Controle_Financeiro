@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
+import { COMMON_PERSON } from '@/lib/people';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 
@@ -39,6 +40,8 @@ export interface Investment {
   current_price: number;
   currency: 'BRL' | 'USD';
   notes: string | null;
+  /** Pessoa dona do ativo; null = casa toda. */
+  person?: string | null;
   created_at: string;
   updated_at: string;
   investment_class?: InvestmentClass;
@@ -98,7 +101,8 @@ const investmentTypeLabels: Record<Investment['type'], string> = {
   etf_us: 'ETF EUA',
 };
 
-export function useInvestments() {
+/** @param person filtro: null = todos; nome = so dela; COMMON_PERSON = so os da casa toda. */
+export function useInvestments(person: string | null = null) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
@@ -129,7 +133,7 @@ export function useInvestments() {
   });
 
   // Fetch investments
-  const { data: investments = [], isLoading: loadingInvestments } = useQuery({
+  const { data: allInvestments = [], isLoading: loadingInvestments } = useQuery({
     queryKey: ['investments', user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
@@ -144,6 +148,11 @@ export function useInvestments() {
     },
     enabled: !!user?.id,
   });
+  // Tudo abaixo (totais, alocacao, projecoes) usa a lista filtrada pela pessoa.
+  const investments = useMemo(
+    () => allInvestments.filter((i) => !person || (person === COMMON_PERSON ? !i.person : i.person === person)),
+    [allInvestments, person],
+  );
 
   // Create investment class
   const createClassMutation = useMutation({

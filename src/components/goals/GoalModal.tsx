@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Target, PiggyBank, Plane, Car, Home, GraduationCap, Shield, Wallet } from "lucide-react";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Goal, GoalFormData } from "@/hooks/useGoals";
@@ -13,6 +13,8 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
+import { PersonSelect } from "@/components/people/PersonSelect";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
@@ -29,6 +31,7 @@ const goalSchema = z.object({
   target_amount: z.coerce.number().min(1, "Meta deve ser maior que 0"),
   current_amount: z.coerce.number().min(0, "Valor deve ser positivo"),
   deadline: z.string().optional(),
+  person: z.string().nullable().optional(),
   category: z.string(),
 });
 
@@ -66,6 +69,7 @@ export function GoalModal({
 
   const {
     register,
+    control,
     handleSubmit,
     reset,
     watch,
@@ -95,6 +99,7 @@ export function GoalModal({
         current_amount: Number(goal.current_amount),
         deadline: goal.deadline || "",
         category: goal.category || "savings",
+        person: goal.person ?? null,
       });
     } else {
       reset({
@@ -104,6 +109,7 @@ export function GoalModal({
         current_amount: 0,
         deadline: "",
         category: "savings",
+        person: null,
       });
     }
   }, [goal, reset]);
@@ -119,6 +125,7 @@ export function GoalModal({
       category: data.category,
       icon: config.icon,
       color: config.color,
+      person: data.person ?? null,
     });
     onClose();
   };
@@ -196,17 +203,28 @@ export function GoalModal({
             </Select>
           </div>
 
+          <div className="space-y-2">
+            <Label className="text-muted-foreground">De quem é a meta</Label>
+            <Controller
+              control={control}
+              name="person"
+              render={({ field }) => (
+                <PersonSelect mode="assign" value={field.value ?? null} onChange={field.onChange} className="bg-secondary/50" />
+              )}
+            />
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="target_amount" className="text-muted-foreground">
                 Valor da Meta (R$)
               </Label>
-              <Input
-                id="target_amount"
-                type="number"
-                step="0.01"
-                {...register("target_amount")}
-                className="bg-secondary/50"
+              <Controller
+                control={control}
+                name="target_amount"
+                render={({ field }) => (
+                  <CurrencyInput id="target_amount" className="bg-secondary/50" value={Number(field.value) || 0} onChange={(n) => field.onChange(n)} onBlur={field.onBlur} ref={field.ref} />
+                )}
               />
               {errors.target_amount && (
                 <p className="text-destructive text-xs">{errors.target_amount.message}</p>
@@ -217,12 +235,12 @@ export function GoalModal({
               <Label htmlFor="current_amount" className="text-muted-foreground">
                 Valor Atual (R$)
               </Label>
-              <Input
-                id="current_amount"
-                type="number"
-                step="0.01"
-                {...register("current_amount")}
-                className="bg-secondary/50"
+              <Controller
+                control={control}
+                name="current_amount"
+                render={({ field }) => (
+                  <CurrencyInput id="current_amount" className="bg-secondary/50" value={Number(field.value) || 0} onChange={(n) => field.onChange(n)} onBlur={field.onBlur} ref={field.ref} />
+                )}
               />
               {errors.current_amount && (
                 <p className="text-destructive text-xs">{errors.current_amount.message}</p>

@@ -87,6 +87,7 @@ export function GoalCard({ goal, onEdit, onDelete, onAddContribution, index }: G
           <div className="flex items-start justify-between gap-2">
             <div>
               <h3 className="text-foreground font-semibold text-base truncate">{goal.name}</h3>
+              {goal.person && <span className="inline-block text-[11px] px-1.5 py-0.5 rounded bg-primary/10 text-primary mt-0.5">{goal.person}</span>}
               {goal.description && (
                 <p className="text-muted-foreground text-sm line-clamp-1 mt-0.5">
                   {goal.description}

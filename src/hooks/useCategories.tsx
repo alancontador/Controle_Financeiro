@@ -177,7 +177,8 @@ export function useCategories() {
         .from("categories")
         .insert(categoriesToInsert);
 
-      if (error) {
+      // 23505: outra tela semeou ao mesmo tempo (indice unico por nome/tipo): so recarrega.
+      if (error && error.code !== "23505") {
         console.error("Error creating default categories:", error);
         return;
       }

@@ -10,6 +10,9 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
+import { parseBRL, formatBRLInput } from "@/lib/money";
+import { PersonSelect } from "@/components/people/PersonSelect";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -24,7 +27,7 @@ import { BudgetWithSpending } from "@/hooks/useBudgets";
 interface BudgetModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (categoryId: string, amount: number) => Promise<void>;
+  onSubmit: (categoryId: string, amount: number, person: string | null) => Promise<void>;
   categories: Category[];
   budget?: BudgetWithSpending | null;
   isLoading?: boolean;
@@ -40,14 +43,17 @@ export function BudgetModal({
 }: BudgetModalProps) {
   const [categoryId, setCategoryId] = useState<string>("");
   const [amount, setAmount] = useState<string>("");
+  const [person, setPerson] = useState<string | null>(null);
 
   useEffect(() => {
     if (budget) {
       setCategoryId(budget.category_id || "");
-      setAmount(budget.amount.toString());
+      setAmount(formatBRLInput(Number(budget.amount)));
+      setPerson(budget.person ?? null);
     } else {
       setCategoryId("");
       setAmount("");
+      setPerson(null);
     }
   }, [budget, isOpen]);
 
@@ -55,7 +61,7 @@ export function BudgetModal({
     e.preventDefault();
     if (!categoryId || !amount) return;
 
-    await onSubmit(categoryId, parseFloat(amount));
+    await onSubmit(categoryId, parseBRL(amount), person);
     onClose();
   };
 
@@ -108,16 +114,14 @@ export function BudgetModal({
 
           {/* Amount Input */}
           <div className="space-y-2">
+            <Label className="text-foreground">De quem</Label>
+            <PersonSelect mode="assign" value={person} onChange={setPerson} className="bg-secondary border-border" />
+            <p className="text-xs text-muted-foreground">Casa toda: soma os gastos de todos. Uma pessoa: só o que ela gastou nessa categoria.</p>
+          </div>
+
+          <div className="space-y-2">
             <Label className="text-foreground">Limite Mensal (R$)</Label>
-            <Input
-              type="number"
-              step="0.01"
-              min="0"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="0,00"
-              className="bg-secondary border-border text-lg"
-            />
+            <CurrencyInput className="bg-secondary border-border text-lg" value={amount} onChange={(_n, f) => setAmount(f)} />
           </div>
 
           {/* Preview */}
@@ -140,7 +144,7 @@ export function BudgetModal({
                 <div>
                   <p className="text-foreground font-medium">{selectedCategory.name}</p>
                   <p className="text-muted-foreground text-sm">
-                    Limite: R$ {parseFloat(amount || "0").toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                    Limite: R$ {parseBRL(amount).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                   </p>
                 </div>
               </div>

@@ -4,10 +4,12 @@ import { X } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { parseBRL } from "@/lib/money";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
@@ -39,8 +41,8 @@ const transactionSchema = z.object({
     .min(1, "Valor é obrigatório")
     .refine(
       (val) => {
-        const num = parseFloat(val.replace(",", "."));
-        return !isNaN(num) && num > 0;
+        const num = parseBRL(val);
+        return num > 0;
       },
       { message: "Valor deve ser um número positivo" }
     )
@@ -116,7 +118,7 @@ export function TransactionModal({
     if (transaction) {
       form.reset({
         description: transaction.description,
-        amount: String(Math.abs(Number(transaction.amount))),
+        amount: Math.abs(Number(transaction.amount)).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
         type: transaction.type,
         category_id: transaction.category_id || undefined,
         holder_name: transaction.holder_name || "__common",
@@ -138,7 +140,7 @@ export function TransactionModal({
   const handleSubmit = async (data: TransactionFormData) => {
     await onSubmit({
       description: data.description,
-      amount: parseFloat(data.amount.replace(",", ".")),
+      amount: parseBRL(data.amount),
       type: data.type,
       category_id: data.category_id || null,
       holder_name: data.holder_name && data.holder_name !== "__common" ? data.holder_name : null,
@@ -264,16 +266,13 @@ export function TransactionModal({
                       <FormItem>
                         <FormLabel>Valor (R$)</FormLabel>
                         <FormControl>
-                          <Input
-                            placeholder="0,00"
+                          <CurrencyInput
                             className="bg-secondary/50 border-border/50"
-                            inputMode="decimal"
-                            {...field}
-                            onChange={(e) => {
-                              // Allow only numbers, comma and dot
-                              const value = e.target.value.replace(/[^0-9.,]/g, "");
-                              field.onChange(value);
-                            }}
+                            name={field.name}
+                            ref={field.ref}
+                            onBlur={field.onBlur}
+                            value={field.value}
+                            onChange={(_n, formatted) => field.onChange(formatted)}
                           />
                         </FormControl>
                         <FormMessage />

@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { COMMON_PERSON } from "@/lib/people";
+import { useDataChanged } from "@/lib/dataEvents";
 import { format, startOfMonth, endOfMonth, subMonths, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -29,7 +31,8 @@ export interface ReportData {
   loading: boolean;
 }
 
-export function useReports(selectedDate: Date = new Date()) {
+/** @param person filtro de pessoa (null = todas). */
+export function useReports(selectedDate: Date = new Date(), person: string | null = null) {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [monthlyData, setMonthlyData] = useState<MonthlyComparison[]>([]);
@@ -48,13 +51,16 @@ export function useReports(selectedDate: Date = new Date()) {
     const startDate = format(startOfMonth(months[5]), "yyyy-MM-dd");
     const endDate = format(endOfMonth(months[0]), "yyyy-MM-dd");
 
-    const { data: transactions, error } = await supabase
+    let query = supabase
       .from("transactions")
       .select("*, category:categories(*)")
       .eq("user_id", user.id)
       .gte("date", startDate)
-      .lte("date", endDate)
-      .order("date", { ascending: false });
+      .lte("date", endDate);
+    // Filtro de pessoa: null = todas; Casa/Comum = sem pessoa; nome = a pessoa.
+    if (person === COMMON_PERSON) query = query.is("holder_name", null);
+    else if (person) query = query.eq("holder_name", person);
+    const { data: transactions, error } = await query.order("date", { ascending: false });
 
     if (error) {
       console.error("Error fetching report data:", error);
@@ -124,11 +130,12 @@ export function useReports(selectedDate: Date = new Date()) {
 
     setMonthlyData(monthlyStats);
     setLoading(false);
-  }, [user, selectedDate]);
+  }, [user, selectedDate, person]);
 
   useEffect(() => {
     fetchReportData();
   }, [fetchReportData]);
+  useDataChanged(fetchReportData, ['transactions', 'cards', 'people']);
 
   const reportData = useMemo<ReportData>(() => {
     return {

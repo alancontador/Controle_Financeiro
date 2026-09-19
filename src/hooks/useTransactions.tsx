@@ -89,6 +89,12 @@ export function useTransactions() {
         .select();
 
       if (error) {
+        // 23505: outra tela semeou ao mesmo tempo (indice unico por nome/tipo). Le o que ficou.
+        if (error.code === "23505") {
+          const { data: seeded } = await supabase.from("categories").select("*").eq("user_id", user.id);
+          setCategories((seeded ?? []) as Category[]);
+          return;
+        }
         console.error("Error creating default categories:", error);
         return;
       }

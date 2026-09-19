@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,6 +22,8 @@ const COLORS = [
 ];
 
 export function CategoryBreakdown({ categories, totalExpense }: CategoryBreakdownProps) {
+  // Fatia em destaque: lista <-> rosca acompanham o mouse.
+  const [active, setActive] = useState<number | null>(null);
   const chartData = categories.map((cat, index) => ({
     name: cat.categoryName,
     value: cat.amount,
@@ -65,9 +68,11 @@ export function CategoryBreakdown({ categories, totalExpense }: CategoryBreakdow
                     outerRadius={100}
                     paddingAngle={2}
                     dataKey="value"
+                    onMouseEnter={(_, index) => setActive(index)}
+                    onMouseLeave={() => setActive(null)}
                   >
                     {chartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
+                      <Cell key={`cell-${index}`} fill={entry.color} opacity={active === null || active === index ? 1 : 0.35} style={{ transition: "opacity 150ms" }} />
                     ))}
                   </Pie>
                   <Tooltip
@@ -91,7 +96,9 @@ export function CategoryBreakdown({ categories, totalExpense }: CategoryBreakdow
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: index * 0.05 }}
-                  className="flex items-center justify-between p-3 rounded-lg bg-secondary/50"
+                  className={`flex items-center justify-between p-3 rounded-lg transition-colors ${active === index ? "bg-primary/10" : "bg-secondary/50"}`}
+                  onMouseEnter={() => setActive(index)}
+                  onMouseLeave={() => setActive(null)}
                 >
                   <div className="flex items-center gap-3">
                     <div

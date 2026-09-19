@@ -14,6 +14,7 @@ import { ReportSummary } from "@/components/reports/ReportSummary";
 import { CategoryBreakdown } from "@/components/reports/CategoryBreakdown";
 import { MonthlyComparison } from "@/components/reports/MonthlyComparison";
 import { PeopleBreakdown } from "@/components/reports/PeopleBreakdown";
+import { PersonSelect } from "@/components/people/PersonSelect";
 import {
   ChevronLeft,
   ChevronRight,
@@ -31,7 +32,8 @@ export default function Reports() {
   const [isExporting, setIsExporting] = useState(false);
   const reportRef = useRef<HTMLDivElement>(null);
 
-  const { selectedMonth, previousMonths, loading, monthlyData } = useReports(selectedDate);
+  const [person, setPerson] = useState<string | null>(null);
+  const { selectedMonth, previousMonths, loading, monthlyData } = useReports(selectedDate, person);
 
   const handlePreviousMonth = () => {
     setSelectedDate((prev) => subMonths(prev, 1));
@@ -169,6 +171,7 @@ export default function Reports() {
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
+              <PersonSelect value={person} onChange={setPerson} className="h-11 w-[210px] bg-secondary/50" />
               {/* Month Selector */}
               <div className="flex items-center gap-1 bg-secondary/50 rounded-xl p-1">
                 <Button

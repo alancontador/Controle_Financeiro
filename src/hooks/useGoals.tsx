@@ -3,6 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/components/ui/use-toast';
 import { Tables } from '@/integrations/supabase/types';
+import { COMMON_PERSON } from '@/lib/people';
+import { notifyDataChanged, useDataChanged } from '@/lib/dataEvents';
 
 export type Goal = Tables<'goals'>;
 
@@ -15,6 +17,8 @@ export interface GoalFormData {
   category: string;
   icon: string;
   color: string;
+  /** Pessoa dona da meta; null = casa toda. */
+  person?: string | null;
 }
 
 const goalCategories = [
@@ -28,7 +32,8 @@ const goalCategories = [
   { value: 'other', label: 'Outro', icon: 'Target', color: '#6B46FF' },
 ];
 
-export function useGoals() {
+/** @param person filtro: null/undefined = todas; nome = so dela; COMMON_PERSON = so as da casa toda. */
+export function useGoals(person?: string | null) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [goals, setGoals] = useState<Goal[]>([]);
@@ -63,6 +68,7 @@ export function useGoals() {
       fetchGoals();
     }
   }, [user, fetchGoals]);
+  useDataChanged(fetchGoals, ['goals', 'people']);
 
   const addGoal = async (data: GoalFormData) => {
     if (!user) return;
@@ -78,6 +84,7 @@ export function useGoals() {
         category: data.category,
         icon: data.icon,
         color: data.color,
+        person: data.person ?? null,
       });
 
       if (error) throw error;
@@ -87,6 +94,7 @@ export function useGoals() {
         description: 'Sua nova meta foi adicionada com sucesso.',
       });
 
+      notifyDataChanged('goals');
       await fetchGoals();
     } catch (error: any) {
       console.error('Error adding goal:', error);
@@ -184,16 +192,19 @@ export function useGoals() {
   };
 
   // Calculate statistics
+  const visibleGoals = goals.filter((g) => !person || (person === COMMON_PERSON ? !g.person : g.person === person));
+
   const stats = {
-    totalGoals: goals.length,
-    completedGoals: goals.filter(g => g.is_completed).length,
-    activeGoals: goals.filter(g => !g.is_completed).length,
-    totalTargetAmount: goals.reduce((acc, g) => acc + Number(g.target_amount), 0),
-    totalCurrentAmount: goals.reduce((acc, g) => acc + Number(g.current_amount), 0),
+    totalGoals: visibleGoals.length,
+    completedGoals: visibleGoals.filter(g => g.is_completed).length,
+    activeGoals: visibleGoals.filter(g => !g.is_completed).length,
+    totalTargetAmount: visibleGoals.reduce((acc, g) => acc + Number(g.target_amount), 0),
+    totalCurrentAmount: visibleGoals.reduce((acc, g) => acc + Number(g.current_amount), 0),
   };
 
   return {
-    goals,
+    goals: visibleGoals,
+    allGoals: goals,
     loading,
     addGoal,
     updateGoal,

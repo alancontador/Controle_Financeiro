@@ -7,6 +7,8 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
+import { parseBRL } from "@/lib/money";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -69,7 +71,7 @@ export function DividendModal({
 
     onSave({
       investment_id: investmentId || null,
-      amount: parseFloat(amount),
+      amount: parseBRL(amount),
       payment_date: paymentDate,
       type,
       notes: notes || null,
@@ -107,16 +109,7 @@ export function DividendModal({
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="amount">Valor (R$)</Label>
-              <Input
-                id="amount"
-                type="number"
-                step="0.01"
-                min="0"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="0,00"
-                required
-              />
+              <CurrencyInput id="amount" required value={amount} onChange={(_n, f) => setAmount(f)} />
             </div>
 
             <div className="space-y-2">

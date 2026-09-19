@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PersonSelect } from "@/components/people/PersonSelect";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -35,6 +36,7 @@ export function InvestmentModal({ isOpen, onClose, onSave, investment, investmen
   const [currentPrice, setCurrentPrice] = useState('0');
   const [currency, setCurrency] = useState<'BRL' | 'USD'>('BRL');
   const [notes, setNotes] = useState('');
+  const [person, setPerson] = useState<string | null>(null);
 
   useEffect(() => {
     if (investment) {
@@ -47,6 +49,7 @@ export function InvestmentModal({ isOpen, onClose, onSave, investment, investmen
       setCurrentPrice(investment.current_price.toString());
       setCurrency(investment.currency);
       setNotes(investment.notes || '');
+      setPerson(investment.person ?? null);
     } else {
       setTicker('');
       setName('');
@@ -57,6 +60,7 @@ export function InvestmentModal({ isOpen, onClose, onSave, investment, investmen
       setCurrentPrice('0');
       setCurrency('BRL');
       setNotes('');
+      setPerson(null);
     }
   }, [investment, isOpen]);
 
@@ -81,6 +85,7 @@ export function InvestmentModal({ isOpen, onClose, onSave, investment, investmen
       current_price: parseFloat(currentPrice) || 0,
       currency,
       notes: notes || null,
+      person,
     });
     onClose();
   };
@@ -242,6 +247,11 @@ export function InvestmentModal({ isOpen, onClose, onSave, investment, investmen
               </div>
             </div>
           )}
+
+          <div className="space-y-2">
+            <Label>De quem é o investimento</Label>
+            <PersonSelect mode="assign" value={person} onChange={setPerson} />
+          </div>
 
           <div className="space-y-2">
             <Label htmlFor="notes">Notas</Label>

@@ -45,6 +45,7 @@ export type Database = {
           created_at: string
           id: string
           period: string
+          person: string | null
           updated_at: string
           user_id: string
         }
@@ -54,6 +55,7 @@ export type Database = {
           created_at?: string
           id?: string
           period?: string
+          person?: string | null
           updated_at?: string
           user_id: string
         }
@@ -63,6 +65,7 @@ export type Database = {
           created_at?: string
           id?: string
           period?: string
+          person?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -272,6 +275,7 @@ export type Database = {
           id: string
           is_completed: boolean
           name: string
+          person: string | null
           target_amount: number
           updated_at: string
           user_id: string
@@ -288,6 +292,7 @@ export type Database = {
           id?: string
           is_completed?: boolean
           name: string
+          person?: string | null
           target_amount: number
           updated_at?: string
           user_id: string
@@ -304,6 +309,7 @@ export type Database = {
           id?: string
           is_completed?: boolean
           name?: string
+          person?: string | null
           target_amount?: number
           updated_at?: string
           user_id?: string
@@ -352,6 +358,7 @@ export type Database = {
           current_price: number
           id: string
           name: string
+          person: string | null
           notes: string | null
           quantity: number
           ticker: string
@@ -367,6 +374,7 @@ export type Database = {
           current_price?: number
           id?: string
           name: string
+          person?: string | null
           notes?: string | null
           quantity?: number
           ticker: string
@@ -382,6 +390,7 @@ export type Database = {
           current_price?: number
           id?: string
           name?: string
+          person?: string | null
           notes?: string | null
           quantity?: number
           ticker?: string

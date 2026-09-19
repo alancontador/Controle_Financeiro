@@ -26,8 +26,8 @@ const iconMap: Record<string, React.ElementType> = {
   Wallet,
 };
 
-export function GoalsCard() {
-  const { goals, loading, stats } = useGoals();
+export function GoalsCard({ person = null }: { person?: string | null } = {}) {
+  const { goals, loading, stats } = useGoals(person);
   const activeGoals = goals.filter(g => !g.is_completed).slice(0, 3);
 
   if (loading) {

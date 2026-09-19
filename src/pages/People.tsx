@@ -8,6 +8,7 @@ import { Sidebar } from '@/components/layout/Sidebar';
 import { MobileNav } from '@/components/layout/MobileNav';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { CurrencyInput } from '@/components/ui/currency-input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -280,7 +281,7 @@ const People = () => {
             <div className="space-y-3">
               <div>
                 <Label htmlFor="pay-amount">Valor</Label>
-                <Input id="pay-amount" value={payAmount} onChange={(e) => setPayAmount(e.target.value)} placeholder="0,00" inputMode="decimal" />
+                <CurrencyInput id="pay-amount" inputMode="decimal" value={payAmount} onChange={(_n, f) => setPayAmount(f)} />
               </div>
               <div>
                 <Label htmlFor="pay-date">Data</Label>

@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { notifyDataChanged, useDataChanged } from '@/lib/dataEvents';
+import { useDataChanged } from '@/lib/dataEvents';
+import { matchesPerson } from '@/lib/people';
 import { format, subMonths, startOfMonth, endOfMonth, parseISO, isToday, isYesterday, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -49,13 +50,16 @@ export interface DashboardStats {
  * @param refMonth mes de referencia dos cartoes e graficos (padrao: o atual).
  *   As faturas importadas costumam ser do mes anterior, entao o dashboard
  *   precisa navegar entre meses em vez de ficar preso ao corrente.
+ * @param person filtro de pessoa (null = todas; nome; COMMON_PERSON = sem pessoa).
  */
-export function useDashboardStats(refMonth: Date = new Date()) {
+export function useDashboardStats(refMonth: Date = new Date(), person: string | null = null) {
   const { user } = useAuth();
   // Chave estavel para os memos (Date novo a cada render nao serve como dependencia).
   const refKey = format(refMonth, 'yyyy-MM');
   const [loading, setLoading] = useState(true);
-  const [allTransactions, setAllTransactions] = useState<any[]>([]);
+  const [fetched, setFetched] = useState<any[]>([]);
+  // Tudo abaixo trabalha com as transacoes ja filtradas pela pessoa escolhida.
+  const allTransactions = useMemo(() => fetched.filter((t) => matchesPerson(t, person)), [fetched, person]);
   const [categories, setCategories] = useState<any[]>([]);
 
   const fetchData = useCallback(async (silent = false) => {
@@ -80,7 +84,7 @@ export function useDashboardStats(refMonth: Date = new Date()) {
 
       if (catError) throw catError;
 
-      setAllTransactions(transactionsData || []);
+      setFetched(transactionsData || []);
       setCategories(categoriesData || []);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);

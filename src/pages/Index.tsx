@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Loader2, Wallet, TrendingUp, CreditCard, PiggyBank } from "lucide-react";
 import { MonthSwitcher } from "@/components/dashboard/MonthSwitcher";
+import { PersonSelect } from "@/components/people/PersonSelect";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Sidebar } from "@/components/layout/Sidebar";
@@ -25,6 +26,8 @@ const Index = () => {
   const navigate = useNavigate();
   // Mes em analise: os cartoes de cima, o grafico e as categorias seguem ele.
   const [month, setMonth] = useState(() => new Date());
+  // Pessoa em analise: null = casa toda. Vale para cartoes, graficos, orcamentos e metas.
+  const [person, setPerson] = useState<string | null>(null);
   const {
     loading,
     stats,
@@ -32,7 +35,7 @@ const Index = () => {
     balanceEvolution,
     expensesByCategory,
     recentTransactions,
-  } = useDashboardStats(month);
+  } = useDashboardStats(month, person);
   const forecast = useRecurringForecast(format(month, "yyyy-MM"));
 
   useEffect(() => {
@@ -71,7 +74,10 @@ const Index = () => {
       <main className="lg:ml-[var(--sidebar-w,16rem)] transition-[margin] duration-200 p-4 lg:p-8 pt-20 lg:pt-8">
         <Header />
 
-        <MonthSwitcher month={month} onChange={setMonth} />
+        <div className="flex flex-wrap items-start gap-3">
+          <MonthSwitcher month={month} onChange={setMonth} />
+          <PersonSelect value={person} onChange={setPerson} className="h-9 w-[220px] mb-4 lg:mb-6" />
+        </div>
 
         {!loading && !hasMonthData && (
           <div className="mb-6 rounded-lg border border-border/60 bg-card/60 px-4 py-3 text-sm text-muted-foreground flex flex-wrap items-center gap-2">
@@ -125,7 +131,7 @@ const Index = () => {
         {/* Budget Alerts & Weekly Summary */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6 mb-6">
           <SpendingByPersonCard month={format(month, 'yyyy-MM')} />
-          <DashboardBudgetAlerts />
+          <DashboardBudgetAlerts month={month} person={person} />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6 mb-6">
@@ -142,7 +148,7 @@ const Index = () => {
         {/* Secondary Content Grid - Responsive */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
           <RecentTransactionsReal transactions={recentTransactions} loading={loading} />
-          <GoalsCard />
+          <GoalsCard person={person} />
         </div>
 
         {/* Footer Microcopy */}

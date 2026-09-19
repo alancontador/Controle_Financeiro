@@ -236,7 +236,7 @@ export function InvestmentsList({
                           />
                         )}
                       </div>
-                      <p className="text-sm text-muted-foreground">{inv.name}</p>
+                      <p className="text-sm text-muted-foreground">{inv.name}{inv.person && <span className="ml-2 text-[11px] px-1.5 py-0.5 rounded bg-primary/10 text-primary">{inv.person}</span>}</p>
                       <p className="text-xs text-muted-foreground">
                         {inv.quantity.toLocaleString('pt-BR')} x {inv.currency === 'BRL' ? 'R$' : '$'} {inv.current_price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </p>

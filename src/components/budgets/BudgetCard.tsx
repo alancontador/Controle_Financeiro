@@ -63,7 +63,7 @@ export function BudgetCard({ budget, onEdit, onDelete, index }: BudgetCardProps)
                   {budget.category?.name || "Categoria"}
                 </h3>
                 <p className="text-muted-foreground text-sm">
-                  Limite mensal
+                  {budget.person ? <span className="text-primary font-medium">{budget.person}</span> : "Casa toda"} · limite mensal
                 </p>
               </div>
             </div>

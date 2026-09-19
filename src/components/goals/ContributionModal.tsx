@@ -9,6 +9,8 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
+import { parseBRL } from "@/lib/money";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 
@@ -45,7 +47,7 @@ export function ContributionModal({
   const Icon = iconMap[goal.icon || 'Target'] || Target;
   const currentProgress = (Number(goal.current_amount) / Number(goal.target_amount)) * 100;
   const remaining = Number(goal.target_amount) - Number(goal.current_amount);
-  const contributionAmount = parseFloat(amount) || 0;
+  const contributionAmount = parseBRL(amount);
   const newAmount = Number(goal.current_amount) + contributionAmount;
   const newProgress = Math.min((newAmount / Number(goal.target_amount)) * 100, 100);
   const willComplete = newAmount >= Number(goal.target_amount);
@@ -100,17 +102,7 @@ export function ContributionModal({
               <Label htmlFor="amount" className="text-muted-foreground">
                 Valor do Aporte (R$)
               </Label>
-              <Input
-                id="amount"
-                type="number"
-                step="0.01"
-                min="0.01"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="0,00"
-                className="bg-secondary/50 text-lg"
-                autoFocus
-              />
+              <CurrencyInput id="amount" className="bg-secondary/50 text-lg" autoFocus value={amount} onChange={(_n, f) => setAmount(f)} />
             </div>
 
             {/* Quick amount buttons */}
