@@ -275,7 +275,7 @@ export function ImportPdfModal({ open, onClose, onConfirm, parsed, categoryOptio
                               <TableHead className="w-[76px] text-center">Parcela</TableHead>
                               <TableHead className="w-[110px] text-right">Valor</TableHead>
                               <TableHead className="w-[190px]">Categoria</TableHead>
-                              {card.lastFour && <TableHead className="w-[210px]">Responsável</TableHead>}
+                              {card.lastFour && <TableHead className="w-[240px]">Responsável</TableHead>}
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -323,7 +323,7 @@ export function ImportPdfModal({ open, onClose, onConfirm, parsed, categoryOptio
                                           )}
                                           <span className="inline-flex items-center gap-1">
                                             <Select value={item.assigned_to || item.holder_name} onValueChange={v => updateItemPerson(globalIdx, v)}>
-                                              <SelectTrigger className={`h-8 text-xs w-[150px] xl:w-[170px] ${item.assigned_to ? 'border-primary/60 text-primary' : ''}`}><SelectValue /></SelectTrigger>
+                                              <SelectTrigger className={`h-8 text-xs w-[150px] sm:w-[180px] ${item.assigned_to ? 'border-primary/60 text-primary' : ''}`} title={item.assigned_to || item.holder_name}><SelectValue /></SelectTrigger>
                                               <SelectContent>
                                                 {personOptions.map(p => <SelectItem key={p} value={p}>{p}{p === person.name ? ' (titular)' : thirdParties?.has(p) ? ' (terceiro)' : ''}</SelectItem>)}
                                               </SelectContent>
