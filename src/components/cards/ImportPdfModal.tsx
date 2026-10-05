@@ -184,7 +184,7 @@ export function ImportPdfModal({ open, onClose, onConfirm, parsed, categoryOptio
 
   return (
     <Dialog open={open} onOpenChange={() => { reset(); onClose(); }}>
-      <DialogContent className="sm:max-w-4xl max-h-[80vh] overflow-y-auto">
+      <DialogContent className="w-[96vw] max-w-[96vw] sm:max-w-[1400px] mx-0 max-h-[88vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Importar Fatura PDF{conferencia ? ` (${conferencia.bank})` : ` (${SUPPORTED_BANKS.slice(0, -1).join(', ')} ou ${SUPPORTED_BANKS[SUPPORTED_BANKS.length - 1]})`}</DialogTitle>
         </DialogHeader>
@@ -270,12 +270,12 @@ export function ImportPdfModal({ open, onClose, onConfirm, parsed, categoryOptio
                         <Table>
                           <TableHeader>
                             <TableRow>
-                              <TableHead>Data</TableHead>
-                              <TableHead>Descrição</TableHead>
-                              <TableHead>Parcela</TableHead>
-                              <TableHead className="text-right">Valor</TableHead>
-                              <TableHead>Categoria</TableHead>
-                              {card.lastFour && <TableHead>Responsável</TableHead>}
+                              <TableHead className="w-[86px]">Data</TableHead>
+                              <TableHead className="min-w-[280px]">Descrição</TableHead>
+                              <TableHead className="w-[76px] text-center">Parcela</TableHead>
+                              <TableHead className="w-[110px] text-right">Valor</TableHead>
+                              <TableHead className="w-[190px]">Categoria</TableHead>
+                              {card.lastFour && <TableHead className="w-[210px]">Responsável</TableHead>}
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -283,30 +283,31 @@ export function ImportPdfModal({ open, onClose, onConfirm, parsed, categoryOptio
                               const globalIdx = startIndex + idx;
                               return (
                                 <TableRow key={idx}>
-                                  <TableCell className="whitespace-nowrap">{fmtDate(item.transaction_date)}</TableCell>
-                                  <TableCell>
+                                  <TableCell className="whitespace-nowrap text-muted-foreground px-2">{fmtDate(item.transaction_date)}</TableCell>
+                                  <TableCell className="px-2">
                                     <Input
                                       value={item.description}
                                       onChange={e => updateItemDesc(globalIdx, e.target.value)}
-                                      className="h-8 text-sm"
+                                      className="h-8 text-sm w-full min-w-[260px]"
+                                      title={item.description}
                                     />
                                   </TableCell>
-                                  <TableCell>
+                                  <TableCell className="px-2 text-center whitespace-nowrap">
                                     {item.installment_current && item.installment_total
                                       ? `${item.installment_current}/${item.installment_total}`
                                       : '-'}
                                   </TableCell>
-                                  <TableCell className={`text-right whitespace-nowrap ${item.amount < 0 ? 'text-emerald-600' : ''}`}>{fmt(item.amount)}</TableCell>
-                                  <TableCell>
+                                  <TableCell className={`px-2 text-right whitespace-nowrap font-medium ${item.amount < 0 ? 'text-emerald-600' : ''}`}>{fmt(item.amount)}</TableCell>
+                                  <TableCell className="px-2">
                                     <Select value={item.category} onValueChange={v => updateItemCategory(globalIdx, v)}>
-                                      <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                                      <SelectTrigger className="h-8 text-sm w-full"><SelectValue className="truncate" /></SelectTrigger>
                                       <SelectContent>
                                         {(categoryOptions ?? CARD_CATEGORIES).map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                                       </SelectContent>
                                     </Select>
                                   </TableCell>
                                   {card.lastFour && (
-                                    <TableCell>
+                                    <TableCell className="px-2">
                                       {isPaymentLine(item.description) ? (
                                         <span className="text-muted-foreground">-</span>
                                       ) : item.split_shares && item.split_shares.length >= 2 ? (
@@ -322,7 +323,7 @@ export function ImportPdfModal({ open, onClose, onConfirm, parsed, categoryOptio
                                           )}
                                           <span className="inline-flex items-center gap-1">
                                             <Select value={item.assigned_to || item.holder_name} onValueChange={v => updateItemPerson(globalIdx, v)}>
-                                              <SelectTrigger className={`h-8 text-xs w-[150px] lg:w-[170px] ${item.assigned_to ? 'border-primary/60 text-primary' : ''}`}><SelectValue /></SelectTrigger>
+                                              <SelectTrigger className={`h-8 text-xs w-[150px] xl:w-[170px] ${item.assigned_to ? 'border-primary/60 text-primary' : ''}`}><SelectValue /></SelectTrigger>
                                               <SelectContent>
                                                 {personOptions.map(p => <SelectItem key={p} value={p}>{p}{p === person.name ? ' (titular)' : thirdParties?.has(p) ? ' (terceiro)' : ''}</SelectItem>)}
                                               </SelectContent>
