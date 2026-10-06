@@ -177,6 +177,9 @@ export function ImportPdfModal({ open, onClose, onConfirm, parsed, categoryOptio
     card.items.push(item);
   }
   const kindOf = (lastFour: string) => cards.find(c => c.lastFour === lastFour)?.kind;
+  // Na PRIMEIRA importacao ainda nao existe ninguem cadastrado: as pessoas da
+  // propria fatura (titular e adicionais) ja valem para realocar e dividir.
+  const allPeople = [...new Set([...groups.map(g => g.name).filter(n => n !== 'Pagamentos'), ...people])];
 
   const total = items.reduce((s, i) => s + i.amount, 0) + previousBalance;
   const totalOk = conferencia?.totalFatura !== undefined && sameCents(conferencia.parsedTotal, conferencia.totalFatura);
@@ -240,7 +243,7 @@ export function ImportPdfModal({ open, onClose, onConfirm, parsed, categoryOptio
 
             {groups.map(person => {
               const personTotal = person.cards.reduce((s, c) => s + c.items.reduce((t, i) => t + i.amount, 0), 0);
-              const personOptions = [...new Set([person.name, ...people])];
+              const personOptions = [...new Set([person.name, ...allPeople])];
               return (
                 <div key={person.name} className="mb-8">
                   <div className="flex items-center justify-between mb-2">
@@ -275,7 +278,7 @@ export function ImportPdfModal({ open, onClose, onConfirm, parsed, categoryOptio
                               <TableHead className="w-[76px] text-center">Parcela</TableHead>
                               <TableHead className="w-[110px] text-right">Valor</TableHead>
                               <TableHead className="w-[190px]">Categoria</TableHead>
-                              {card.lastFour && <TableHead className="w-[240px]">Responsável</TableHead>}
+                              {card.lastFour && <TableHead className="w-[260px]">Responsável / divisão</TableHead>}
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -311,8 +314,9 @@ export function ImportPdfModal({ open, onClose, onConfirm, parsed, categoryOptio
                                       {isPaymentLine(item.description) ? (
                                         <span className="text-muted-foreground">-</span>
                                       ) : item.split_shares && item.split_shares.length >= 2 ? (
-                                        <button type="button" onClick={() => setSplittingIdx(globalIdx)} className="text-xs text-left text-primary hover:underline flex items-center gap-1" title="Editar divisão">
-                                          <Scissors className="w-3 h-3 shrink-0" /><span>{describeShares(item.amount, item.split_shares)}</span>
+                                        <button type="button" onClick={() => setSplittingIdx(globalIdx)} className="text-xs text-left text-primary hover:underline flex items-start gap-1" title="Editar a divisão desta compra">
+                                          <Scissors className="w-3 h-3 shrink-0 mt-0.5" />
+                                          <span><span className="font-medium">Dividido:</span> {describeShares(item.amount, item.split_shares)}</span>
                                         </button>
                                       ) : (
                                         <>
@@ -323,13 +327,18 @@ export function ImportPdfModal({ open, onClose, onConfirm, parsed, categoryOptio
                                           )}
                                           <span className="inline-flex items-center gap-1">
                                             <Select value={item.assigned_to || item.holder_name} onValueChange={v => updateItemPerson(globalIdx, v)}>
-                                              <SelectTrigger className={`h-8 text-xs w-[150px] sm:w-[180px] ${item.assigned_to ? 'border-primary/60 text-primary' : ''}`} title={item.assigned_to || item.holder_name}><SelectValue /></SelectTrigger>
+                                              <SelectTrigger className={`h-8 text-xs w-[130px] sm:w-[150px] ${item.assigned_to ? 'border-primary/60 text-primary' : ''}`} title={item.assigned_to || item.holder_name}><SelectValue /></SelectTrigger>
                                               <SelectContent>
                                                 {personOptions.map(p => <SelectItem key={p} value={p}>{p}{p === person.name ? ' (titular)' : thirdParties?.has(p) ? ' (terceiro)' : ''}</SelectItem>)}
                                               </SelectContent>
                                             </Select>
-                                            <button type="button" onClick={() => setSplittingIdx(globalIdx)} className="inline-flex items-center text-muted-foreground hover:text-primary" title="Dividir entre pessoas" aria-label="Dividir entre pessoas">
-                                              <Scissors className="w-3.5 h-3.5" />
+                                            <button
+                                              type="button"
+                                              onClick={() => setSplittingIdx(globalIdx)}
+                                              className="inline-flex items-center gap-1 rounded-md border border-border px-1.5 py-1 text-[11px] text-muted-foreground hover:text-primary hover:border-primary/60 whitespace-nowrap"
+                                              title="Dividir o valor desta compra entre duas ou mais pessoas"
+                                            >
+                                              <Scissors className="w-3.5 h-3.5 shrink-0" /> Dividir
                                             </button>
                                           </span>
                                         </>
@@ -362,7 +371,7 @@ export function ImportPdfModal({ open, onClose, onConfirm, parsed, categoryOptio
       <SplitItemDialog
         item={splittingIdx !== null ? items[splittingIdx] ?? null : null}
         current={splittingIdx !== null ? (items[splittingIdx]?.split_shares ?? items[splittingIdx]?.remembered_shares ?? []) : []}
-        people={people}
+        people={allPeople}
         thirdParties={thirdParties}
         onClose={() => setSplittingIdx(null)}
         onSave={async (shares) => { if (splittingIdx !== null) updateItemSplit(splittingIdx, shares); return true; }}

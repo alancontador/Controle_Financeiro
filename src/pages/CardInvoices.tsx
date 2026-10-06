@@ -129,6 +129,9 @@ const CardInvoices = () => {
     cardGroup.items.push(item);
   }
   const grouped = Object.fromEntries(people.map(p => [p.name, p.cards.flatMap(c => c.items)]));
+  // Pessoas que aparecem nesta fatura: servem para realocar/dividir mesmo antes
+  // de alguem estar cadastrado na aba Pessoas.
+  const invoicePeople = people.map(p => p.name).filter(n => n !== 'Pagamentos');
   // card_holders tem uma linha por cartao; os modais de lancamento manual querem pessoas.
   const uniqueHolders = holders.filter((h, i, arr) => arr.findIndex(o => o.holder_name === h.holder_name) === i);
 
@@ -315,8 +318,8 @@ const CardInvoices = () => {
                                         <TableHead className="w-[72px]">Data</TableHead>
                                         <TableHead>Descrição</TableHead>
                                         <TableHead className="hidden md:table-cell">Categoria</TableHead>
-                                        <TableHead>Responsável</TableHead>
-                                        <TableHead className="hidden xl:table-cell">Parcela</TableHead>
+                                        <TableHead className="w-[224px]">Responsável / divisão</TableHead>
+                                        <TableHead className="hidden 2xl:table-cell">Parcela</TableHead>
                                         <TableHead className="text-right">Valor</TableHead>
                                       </TableRow>
                                     </TableHeader>
@@ -329,22 +332,23 @@ const CardInvoices = () => {
                                             {/* Em telas menores, categoria e parcela ficam aqui em vez de colunas proprias */}
                                             <span className="text-xs text-muted-foreground md:hidden">{item.category}</span>
                                             {item.installment_current && item.installment_total && (
-                                              <span className="ml-1 text-[11px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground xl:hidden">{item.installment_current}/{item.installment_total}</span>
+                                              <span className="ml-1 text-[11px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground 2xl:hidden">{item.installment_current}/{item.installment_total}</span>
                                             )}
                                           </TableCell>
                                           <TableCell className="text-muted-foreground hidden md:table-cell">{item.category}</TableCell>
-                                          <TableCell>
+                                          <TableCell className="whitespace-nowrap">
                                             {item.holder_name === 'Pagamentos' || isPaymentLine(item.description) ? (
                                               <span className="text-muted-foreground">-</span>
                                             ) : splits[item.id]?.length ? (
                                               <button
                                                 type="button"
                                                 onClick={() => setSplittingItem(item)}
-                                                className="text-xs text-left text-primary hover:underline flex items-center gap-1"
-                                                title="Editar divisão"
+                                                className="text-xs text-left text-primary hover:underline flex items-start gap-1"
+                                                title="Editar a divisão desta compra"
                                               >
-                                                <Scissors className="w-3 h-3 shrink-0" />
+                                                <Scissors className="w-3 h-3 shrink-0 mt-0.5" />
                                                 <span>
+                                                  <span className="font-medium">Dividido:</span>{' '}
                                                   {splits[item.id].map((s) => `${s.person.split(' ')[0]} ${Math.round((s.amount / Number(item.amount)) * 100)}%`).join(' · ')}
                                                 </span>
                                               </button>
@@ -353,11 +357,11 @@ const CardInvoices = () => {
                                                 value={item.assigned_to || item.holder_name}
                                                 onValueChange={(v) => reassignItem(item, v === item.holder_name ? null : v)}
                                               >
-                                                <SelectTrigger className={`h-8 text-xs w-[150px] lg:w-[180px] inline-flex ${item.assigned_to ? 'border-primary/60 text-primary' : ''}`} title={item.assigned_to ? `Compra no cartão de ${item.holder_name}, realocada` : 'Quem é responsável por esta despesa'}>
+                                                <SelectTrigger className={`h-8 text-xs w-[118px] lg:w-[132px] inline-flex ${item.assigned_to ? 'border-primary/60 text-primary' : ''}`} title={item.assigned_to ? `Compra no cartão de ${item.holder_name}, realocada` : 'Quem é responsável por esta despesa'}>
                                                   <SelectValue />
                                                 </SelectTrigger>
                                                 <SelectContent>
-                                                  {[...new Set([item.holder_name, ...householdPeople])].map((p) => (
+                                                  {[...new Set([item.holder_name, ...invoicePeople, ...householdPeople])].map((p) => (
                                                     <SelectItem key={p} value={p}>{p}{p === item.holder_name ? ' (titular do cartão)' : thirdParties.has(p) ? ' (terceiro)' : ''}</SelectItem>
                                                   ))}
                                                 </SelectContent>
@@ -367,15 +371,14 @@ const CardInvoices = () => {
                                               <button
                                                 type="button"
                                                 onClick={() => setSplittingItem(item)}
-                                                className="ml-1 inline-flex items-center text-muted-foreground hover:text-primary align-middle"
-                                                title="Dividir entre pessoas"
-                                                aria-label="Dividir entre pessoas"
+                                                className="ml-1 inline-flex items-center gap-1 rounded-md border border-border px-1.5 py-1 text-[11px] text-muted-foreground hover:text-primary hover:border-primary/60 align-middle whitespace-nowrap"
+                                                title="Dividir o valor desta compra entre duas ou mais pessoas"
                                               >
-                                                <Scissors className="w-3.5 h-3.5" />
+                                                <Scissors className="w-3.5 h-3.5 shrink-0" /> Dividir
                                               </button>
                                             )}
                                           </TableCell>
-                                          <TableCell className="hidden xl:table-cell">
+                                          <TableCell className="hidden 2xl:table-cell">
                                             {item.installment_current && item.installment_total
                                               ? `${item.installment_current}/${item.installment_total}`
                                               : '-'}
@@ -429,7 +432,7 @@ const CardInvoices = () => {
         <SplitItemDialog
           item={splittingItem}
           current={splittingItem ? splits[splittingItem.id] ?? [] : []}
-          people={householdPeople}
+          people={[...new Set([...invoicePeople, ...householdPeople])]}
           thirdParties={thirdParties}
           onClose={() => setSplittingItem(null)}
           onSave={(shares) => (splittingItem ? setItemSplits(splittingItem, shares) : Promise.resolve(false))}
