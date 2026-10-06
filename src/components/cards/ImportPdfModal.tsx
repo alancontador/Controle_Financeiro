@@ -20,10 +20,18 @@ import { CARD_KINDS, CARD_KIND_LABEL, classifyInvoiceCards, type CardKind, type 
 import { resolveAttribution, type AttributionMemory } from '@/lib/cards/attribution';
 
 /** Item no formato que a tabela invoice_items espera. */
-export type ImportedInvoiceItem = ParsedItem & { is_previous_balance: boolean; assigned_to?: string | null; split_shares?: Share[] };
+export type ImportedInvoiceItem = ParsedItem & {
+  is_previous_balance: boolean;
+  assigned_to?: string | null;
+  /** true quando o usuario mexeu no Responsavel aqui: a escolha vence a memoria. */
+  person_touched?: boolean;
+  split_shares?: Share[];
+};
 
 type ReviewItem = ParsedItem & {
   assigned_to?: string | null;
+  /** O usuario escolheu o responsavel nesta revisao (inclusive 'de volta ao titular'). */
+  person_touched?: boolean;
   /** Divisao lembrada de importacao anterior (texto para exibir e partes para editar). */
   remembered_split?: string;
   remembered_shares?: Share[];
@@ -133,7 +141,9 @@ export function ImportPdfModal({ open, onClose, onConfirm, parsed, categoryOptio
   };
 
   const updateItemPerson = (index: number, person: string) => {
-    setItems(prev => prev.map((item, i) => i === index ? { ...item, assigned_to: person === item.holder_name ? null : person } : item));
+    // person_touched: escolher o proprio titular e uma decisao ("nao e de mais ninguem"),
+    // e tem que vencer a realocacao lembrada de uma importacao anterior.
+    setItems(prev => prev.map((item, i) => i === index ? { ...item, assigned_to: person === item.holder_name ? null : person, person_touched: true } : item));
   };
 
   const updateItemSplit = (index: number, shares: Share[]) => {
@@ -254,7 +264,6 @@ export function ImportPdfModal({ open, onClose, onConfirm, parsed, categoryOptio
                   </div>
                   {person.cards.map(card => {
                     const cardTotal = card.items.reduce((s, i) => s + i.amount, 0);
-                    const startIndex = items.indexOf(card.items[0]);
                     const kind = kindOf(card.lastFour);
                     return (
                       <div key={card.lastFour || 'sem-cartao'} className="mb-4 rounded-lg border border-border/60 p-3">
@@ -283,7 +292,10 @@ export function ImportPdfModal({ open, onClose, onConfirm, parsed, categoryOptio
                           </TableHeader>
                           <TableBody>
                             {card.items.map((item, idx) => {
-                              const globalIdx = startIndex + idx;
+                              // Indice do proprio item: somar ao indice do primeiro do bloco
+                              // supunha que os lancamentos de cada cartao estao em sequencia,
+                              // e a escolha ia parar em outra linha quando nao estavam.
+                              const globalIdx = items.indexOf(item);
                               return (
                                 <TableRow key={idx}>
                                   <TableCell className="whitespace-nowrap text-muted-foreground px-2">{fmtDate(item.transaction_date)}</TableCell>

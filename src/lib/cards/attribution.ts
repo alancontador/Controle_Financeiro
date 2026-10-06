@@ -70,3 +70,54 @@ export function fractionsFromShares(amount: number, shares: Share[]): FractionSh
   if (amount === 0) return [];
   return shares.map((s) => ({ person: s.person, fraction: s.amount / amount }));
 }
+
+/** O que a revisao da importacao decidiu para um lancamento. */
+export interface ReviewChoice {
+  /** Responsavel escolhido na revisao (null = o titular do cartao). */
+  assignedInReview?: string | null;
+  /** O usuario mexeu no responsavel (inclusive escolhendo o titular de volta). */
+  personTouched?: boolean;
+  /** Divisao feita na revisao; [] = tirou a divisao lembrada; undefined = nao mexeu. */
+  splitShares?: Share[];
+}
+
+export interface AttributionDecision {
+  /** Vai para invoice_items.assigned_to. */
+  assigned: string | null;
+  /** Divisao a gravar em invoice_item_splits (vazio = nenhuma). */
+  splitToApply: Share[];
+  /** O que gravar na memoria; null = nao mexer no que ja esta lembrado. */
+  memory: { assigned_to: string | null; shares: FractionShare[] | null } | null;
+}
+
+/**
+ * Junta a escolha da revisao com o que estava lembrado de importacoes anteriores.
+ * Regra: o que o usuario escolheu agora sempre vence a memoria - inclusive
+ * escolher o titular de volta, que antes era confundido com "nao mexeu" e fazia
+ * a realocacao antiga voltar sozinha.
+ */
+export function decideImportAttribution(amount: number, choice: ReviewChoice, remembered: Attribution | null): AttributionDecision {
+  const assignedInReview = choice.assignedInReview ?? null;
+
+  if (choice.splitShares && choice.splitShares.length >= 2) {
+    const fractions = fractionsFromShares(amount, choice.splitShares);
+    return { assigned: null, splitToApply: choice.splitShares, memory: { assigned_to: null, shares: fractions } };
+  }
+  if (choice.splitShares && choice.splitShares.length === 0 && remembered?.shares) {
+    return { assigned: assignedInReview, splitToApply: [], memory: { assigned_to: assignedInReview, shares: null } };
+  }
+  if (assignedInReview) {
+    return { assigned: assignedInReview, splitToApply: [], memory: { assigned_to: assignedInReview, shares: null } };
+  }
+  if (choice.personTouched) {
+    // Escolheu o titular: esquece a realocacao lembrada em vez de reaplica-la.
+    return { assigned: null, splitToApply: [], memory: { assigned_to: null, shares: null } };
+  }
+  if (remembered?.shares) {
+    return { assigned: null, splitToApply: sharesFromFractions(amount, remembered.shares), memory: null };
+  }
+  if (remembered?.assigned_to) {
+    return { assigned: remembered.assigned_to, splitToApply: [], memory: null };
+  }
+  return { assigned: null, splitToApply: [], memory: null };
+}

@@ -10,7 +10,7 @@ import {
 } from '@/lib/pdf/categorize';
 import type { ParsedHeader, ParsedItem } from '@/lib/pdf/types';
 import type { CardKind, InvoiceCard } from '@/lib/cards/kinds';
-import { attributionKeys, fractionsFromShares, resolveAttribution, sharesFromFractions, type Attribution, type AttributionMemory } from '@/lib/cards/attribution';
+import { attributionKeys, decideImportAttribution, resolveAttribution, type Attribution, type AttributionMemory, type FractionShare } from '@/lib/cards/attribution';
 import type { Share } from '@/lib/cards/split';
 import { MIRROR_NOTE } from '@/lib/cards/mirror';
 import { loadThirdPartySet } from '@/hooks/usePeople';
@@ -22,6 +22,8 @@ export interface ImportableItem extends ParsedItem {
   is_previous_balance: boolean;
   /** Realocacao feita na revisao: responsavel diferente do titular do cartao. */
   assigned_to?: string | null;
+  /** O usuario escolheu o responsavel na revisao (inclusive de volta ao titular). */
+  person_touched?: boolean;
   /**
    * Divisao feita na revisao. undefined = nao mexeu (vale a divisao lembrada, se
    * houver); [] = tirou a divisao lembrada; 2+ partes = divide assim e lembra.
@@ -205,28 +207,24 @@ export function useInvoiceImport() {
 
       // Reaplica realocacoes e divisoes lembradas. O que o usuario escolheu na
       // revisao (assigned_to) vence a memoria e e gravado nela.
-      const plannedSplits = new Map<number, ReturnType<typeof sharesFromFractions>>();
-      const memoryUpserts: { key: string; assigned_to: string | null; shares?: ReturnType<typeof fractionsFromShares> | null }[] = [];
+      const plannedSplits = new Map<number, Share[]>();
+      const memoryUpserts: { key: string; assigned_to: string | null; shares: FractionShare[] | null }[] = [];
       const rows = items.map((item, idx) => {
         let assigned = item.assigned_to ?? null;
         if (item.card_last_four) {
-          const remembered = resolveAttribution(item, attribution);
-          const keys = attributionKeys(item);
-          if (item.split_shares && item.split_shares.length >= 2) {
-            // Divisao feita na revisao: grava e lembra (compra exata + descricao no cartao).
-            assigned = null;
-            plannedSplits.set(idx, item.split_shares);
-            const fractions = fractionsFromShares(item.amount, item.split_shares);
-            memoryUpserts.push({ key: keys.purchase, assigned_to: null, shares: fractions }, { key: keys.description, assigned_to: null, shares: fractions });
-          } else if (item.split_shares && item.split_shares.length === 0 && remembered?.shares) {
-            // Tirou a divisao lembrada: esquece.
-            memoryUpserts.push({ key: keys.purchase, assigned_to: assigned, shares: null }, { key: keys.description, assigned_to: assigned, shares: null });
-          } else if (assigned) {
-            memoryUpserts.push({ key: keys.purchase, assigned_to: assigned }, { key: keys.description, assigned_to: assigned });
-          } else if (remembered?.shares) {
-            plannedSplits.set(idx, sharesFromFractions(item.amount, remembered.shares));
-          } else if (remembered?.assigned_to) {
-            assigned = remembered.assigned_to;
+          const decision = decideImportAttribution(item.amount, {
+            assignedInReview: item.assigned_to ?? null,
+            personTouched: item.person_touched,
+            splitShares: item.split_shares,
+          }, resolveAttribution(item, attribution));
+          assigned = decision.assigned;
+          if (decision.splitToApply.length > 0) plannedSplits.set(idx, decision.splitToApply);
+          if (decision.memory) {
+            const keys = attributionKeys(item);
+            memoryUpserts.push(
+              { key: keys.purchase, assigned_to: decision.memory.assigned_to, shares: decision.memory.shares },
+              { key: keys.description, assigned_to: decision.memory.assigned_to, shares: decision.memory.shares },
+            );
           }
         }
         // So colunas reais de invoice_items: a revisao carrega campos auxiliares no item.
@@ -255,14 +253,25 @@ export function useInvoiceImport() {
         return false;
       }
       if (memoryUpserts.length > 0) {
-        await supabase.from('attribution_memory').upsert(
-          memoryUpserts.map((m) => ({ user_id: user.id, key: m.key, assigned_to: m.assigned_to, shares: (m.shares ?? null) as unknown as Json, updated_at: new Date().toISOString() })),
+        // A mesma chave duas vezes no mesmo lote (duas compras iguais no mesmo cartao)
+        // faz o Postgres recusar o upsert INTEIRO ("cannot affect row a second time")
+        // e nada era lembrado. Mantem a ultima decisao de cada chave.
+        const byKey = new Map(memoryUpserts.map((m) => [m.key, m]));
+        const { error: memError } = await supabase.from('attribution_memory').upsert(
+          [...byKey.values()].map((m) => ({ user_id: user.id, key: m.key, assigned_to: m.assigned_to, shares: (m.shares ?? null) as unknown as Json, updated_at: new Date().toISOString() })),
           { onConflict: 'user_id,key' },
         );
+        if (memError) {
+          toast({
+            title: 'Lançamentos gravados, mas não guardei as realocações',
+            description: `${memError.message}. Na próxima importação pode ser preciso escolher o responsável de novo.`,
+            variant: 'destructive',
+          });
+        }
       }
 
       // Divisoes lembradas: casa cada linha gravada com a de origem (mesma ordem; confere pela descricao/valor).
-      const splitByRowId = new Map<string, ReturnType<typeof sharesFromFractions>>();
+      const splitByRowId = new Map<string, Share[]>();
       if (plannedSplits.size > 0 && inserted) {
         const used = new Set<number>();
         for (const [idx, shares] of plannedSplits) {
